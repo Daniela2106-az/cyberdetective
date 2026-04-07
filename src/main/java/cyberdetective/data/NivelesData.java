@@ -71,27 +71,21 @@ public class NivelesData {
     public static Caso getCasoNivel1() {
         // Las evidencias del nivel 1 revelan el nombre de usuario del agresor
         String[] todasEvidencias = {
-                "Captura de pantalla: mensaje ofensivo enviado por " + usuario(),
-                "Perfil público del agresor: usuario " + usuario() +
-                        ", cuenta creada hace 3 meses",
-                "Historial exportado: 14 mensajes ofensivos desde " + usuario() +
-                        " en los últimos 7 días",
-                "Registro de la plataforma: cuenta " + usuario() +
-                        " activa desde " + dispositivo(),
-                "Testimonio de compañera: 'Vi que era la cuenta de " +
-                        usuario() + " quien enviaba los mensajes'"
+                "REPORTE INICIAL: Primeros mensajes detectados hace 3 meses por " + usuario(),
+                "Perfil público: La cuenta " + usuario() + " fue creada hace 90 días exactamente.",
+                "Historial antiguo: Registro de actividad sospechosa desde el inicio del semestre.",
+                "Registro de la plataforma: Cuenta " + usuario() + " vinculada al dispositivo " + dispositivo(),
+                "Testimonio: 'Los problemas con " + usuario() + " empezaron hace meses, en las primeras clases.'"
         };
 
         return new Caso(
                 1,
                 "Injuria en redes sociales",
-                "Valeria recibe mensajes ofensivos de forma repetida. " +
-                        "Los mensajes atacan su imagen y afectan su reputación.",
+                "Valeria recibe mensajes ofensivos de forma repetida.",
                 elegirEvidencias(todasEvidencias, 3),
-                "Artículo 220 del Código Penal Colombiano – Injuria",
-                "Multa de 1 a 3 salarios mínimos o sanciones legales " +
-                        "por afectar el buen nombre de una persona.",
-                3
+                "Artículo 220 del Código Penal – Injuria",
+                "Multa de 1 a 3 salarios mínimos.",
+                3, 1 // 1 es el inicio de la cronología
         );
     }
 
@@ -99,15 +93,11 @@ public class NivelesData {
 
     public static Caso getCasoNivel2() {
         String[] todasEvidencias = {
-                "Publicación original del rumor: subida por " + usuario() +
-                        " el martes a las 10:03pm",
-                "Metadatos de la publicación: creada desde " + dispositivo(),
-                "Captura del perfil: " + usuario() +
-                        " compartió la publicación falsa primero antes que nadie",
-                "Registro de la plataforma: la publicación fue reportada " +
-                        "3 veces, todas apuntando a " + usuario(),
-                "Análisis de texto: el estilo de escritura coincide con el patrón — " +
-                        patron()
+                "Publicación del RUMOR: Subida por " + usuario() + " hace 1 mes (mediados del mes pasado).",
+                "Metadatos: El post viral fue creado desde " + dispositivo() + " durante las vacaciones pasadas.",
+                "Captura: El rumor empezó a circular masivamente 30 días después de los primeros mensajes.",
+                "Registro: La publicación fue reportada por primera vez el mes anterior.",
+                "Análisis: El patrón " + patron() + " se identificó en publicaciones de hace 4 semanas."
         };
 
         return new Caso(
@@ -120,7 +110,7 @@ public class NivelesData {
                 "Artículo 221 del Código Penal Colombiano – Calumnia",
                 "Multa o sanciones penales por difundir acusaciones falsas " +
                         "que afectan la reputación de una persona.",
-                5
+                5, 2
         );
     }
 
@@ -128,15 +118,11 @@ public class NivelesData {
 
     public static Caso getCasoNivel3() {
         String[] todasEvidencias = {
-                "Dirección IP registrada al crear la cuenta falsa: " + ip(),
-                "Metadatos del dispositivo usado para crear el perfil: " +
-                        dispositivo(),
-                "La foto robada de Valeria fue descargada desde la cuenta " +
-                        usuario() + " 2 días antes de crear el perfil falso",
-                "Análisis forense: la cuenta falsa y la cuenta " + usuario() +
-                        " usaron la misma red WiFi",
-                "Reporte de la plataforma: el perfil falso fue creado " +
-                        "desde el mismo dispositivo que " + usuario()
+                "ALERTA: Perfil falso creado hace apenas 3 días usando la IP " + ip(),
+                "Evidencia: La foto de Valeria fue descargada por " + usuario() + " hace solo 72 horas.",
+                "Conexión: La cuenta suplantadora se activó el pasado fin de semana.",
+                "Análisis forense: El acceso desde " + dispositivo() + " ocurrió hace 3 días.",
+                "Reporte: El perfil falso empezó a atacar a otros hace apenas unas jornadas."
         };
 
         return new Caso(
@@ -149,7 +135,7 @@ public class NivelesData {
                 "Ley 1273 de 2009 – Delitos Informáticos en Colombia",
                 "Sanciones penales de 48 a 96 meses de prisión y multas " +
                         "de 100 a 1000 salarios mínimos según el daño causado.",
-                8
+                8, 3
         );
     }
 
@@ -157,13 +143,11 @@ public class NivelesData {
 
     public static Caso getCasoNivel4() {
         String[] todasEvidencias = {
-                "Las 4 cuentas que atacaron a Valeria comparten la IP: " + ip(),
-                "Análisis de horarios: todos los ataques ocurrieron " +
-                        "entre 9pm y 11pm, mismo horario que " + usuario(),
-                "Patrón de escritura idéntico en todas las cuentas: " + patron(),
-                "Metadatos: todas las cuentas usaron " + dispositivo(),
-                "Registro de actividad: la cuenta principal de las 4 es " +
-                        usuario() + ", las demás fueron creadas después"
+                "ATAQUE FINAL: Coordinación de 4 cuentas detectada HOY mismo.",
+                "Análisis de tiempo: Todos los ataques ocurrieron en las últimas 2 horas.",
+                "Patrón actual: El estilo " + patron() + " se está usando en este momento.",
+                "Metadatos recientes: Conexión activa ahora desde " + dispositivo() + " con IP " + ip(),
+                "Registro: Las cuentas secundarias se activaron hoy para el ataque final."
         };
 
         return new Caso(
@@ -177,7 +161,7 @@ public class NivelesData {
                         "Hostigamiento reiterado",
                 "Sanciones penales agravadas por reincidencia y uso " +
                         "de múltiples identidades digitales para cometer el delito.",
-                10
+                10, 4
         );
     }
 
@@ -271,9 +255,9 @@ public class NivelesData {
                     {
                             "¿Qué ley colombiana regula los delitos informáticos " +
                                     "como la suplantación de identidad digital?",
-                            "Ley 100 de 1993",
-                            "Ley 1273 de 2009",
-                            "Ley 599 de 2000",
+                            "Ley 100 de 1993 - Sistema de seguridad social.",
+                            "Ley 1273 de 2009 – Delitos informáticos en Colombia.",
+                            "Ley 1010 de 2006 - Acoso laboral.",
                             "1"
                     },
                     {

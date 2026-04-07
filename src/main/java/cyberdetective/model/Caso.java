@@ -8,11 +8,12 @@ public class Caso {
     private String[] evidencias;
     private String leyColombia;
     private String penaAplicable;
-    private int gravedad; // criterio de ordenamiento en el AVL (1 = leve, 10 = grave)
+    private int gravedad; // para el AVL
+    private int ordenCronologico; // 1 = más antiguo, 10 = más reciente
 
     public Caso(int id, String tipoAcoso, String descripcion,
                 String[] evidencias, String leyColombia,
-                String penaAplicable, int gravedad) {
+                String penaAplicable, int gravedad, int ordenCronologico) {
         this.id = id;
         this.tipoAcoso = tipoAcoso;
         this.descripcion = descripcion;
@@ -20,7 +21,10 @@ public class Caso {
         this.leyColombia = leyColombia;
         this.penaAplicable = penaAplicable;
         this.gravedad = gravedad;
+        this.ordenCronologico = ordenCronologico;
     }
+
+    public int getOrdenCronologico() { return ordenCronologico; }
 
     // El árbol AVL se ordena por gravedad del delito
     public int getGravedad() { return gravedad; }

@@ -38,7 +38,7 @@ public class AccionesNivel {
 
     private boolean[] accionesCompletadas;
     private int nivel;
-    private static final int TOTAL_NIVELES = 4;
+    private static final int TOTAL_NIVELES = 5;
 
     // UI global — se construye una sola vez
     private Label labelMensajeAlex;
@@ -51,6 +51,10 @@ public class AccionesNivel {
     private Label labelProgreso;
     private VisualizadorArbol visualizadorArbol;
     private List<javafx.scene.Node> nodosAccionesCache;
+    private StackPane stackCentral;
+    private Button btnInvCache;
+    private Button btnArbolBtnCache;
+    private Button btnEvBtnCache;
 
     // Nivel final
     private List<Caso> ordenCorrecto;
@@ -89,8 +93,10 @@ public class AccionesNivel {
         scrollCentral.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
         scrollCentral.setStyle("-fx-background-color: transparent; -fx-background: transparent;");
 
+        stackCentral = new StackPane(scrollCentral);
+
         root.setLeft(construirPanelLateral());
-        root.setCenter(scrollCentral);
+        root.setCenter(stackCentral);
 
         // Reutilizar la Scene existente, solo cambiar el root
         Scene scene = stage.getScene();
@@ -158,8 +164,8 @@ public class AccionesNivel {
         Label progresoEtq = new Label("PROGRESO DEL DETECTIVE");
         progresoEtq.getStyleClass().add("etiqueta-seccion");
 
-        int nivelActual = Math.min(nivel, TOTAL_NIVELES);
-        double progreso = (double)(nivelActual - 1) / TOTAL_NIVELES;
+        int nivelActual = nivel;
+        double progreso = (double)nivelActual / TOTAL_NIVELES;
         barraProgreso = new ProgressBar(progreso);
         barraProgreso.setMaxWidth(Double.MAX_VALUE);
         barraProgreso.setPrefHeight(6);
@@ -190,40 +196,40 @@ public class AccionesNivel {
             Label vistasEtq = new Label("VISTAS");
             vistasEtq.getStyleClass().add("etiqueta-seccion");
 
-            Button btnInv = new Button("📋  Investigación");
-            btnInv.setMaxWidth(Double.MAX_VALUE);
-            btnInv.setStyle(estiloNavActivo());
+            btnInvCache = new Button("📋  Investigación");
+            btnInvCache.setMaxWidth(Double.MAX_VALUE);
+            btnInvCache.setStyle(estiloNavActivo());
 
-            Button btnArbolBtn = new Button("🌳  Árbol AVL");
-            btnArbolBtn.setMaxWidth(Double.MAX_VALUE);
-            btnArbolBtn.setStyle(estiloNavInactivo());
+            btnArbolBtnCache = new Button("🌳  Árbol AVL");
+            btnArbolBtnCache.setMaxWidth(Double.MAX_VALUE);
+            btnArbolBtnCache.setStyle(estiloNavInactivo());
 
-            Button btnEvBtn = new Button("🔍  Evidencias");
-            btnEvBtn.setMaxWidth(Double.MAX_VALUE);
-            btnEvBtn.setStyle(estiloNavInactivo());
+            btnEvBtnCache = new Button("🔍  Evidencias");
+            btnEvBtnCache.setMaxWidth(Double.MAX_VALUE);
+            btnEvBtnCache.setStyle(estiloNavInactivo());
 
-            btnInv.setOnAction(e -> {
-                btnInv.setStyle(estiloNavActivo());
-                btnArbolBtn.setStyle(estiloNavInactivo());
-                btnEvBtn.setStyle(estiloNavInactivo());
+            btnInvCache.setOnAction(e -> {
+                btnInvCache.setStyle(estiloNavActivo());
+                btnArbolBtnCache.setStyle(estiloNavInactivo());
+                btnEvBtnCache.setStyle(estiloNavInactivo());
                 mostrarFaseAcciones();
             });
-            btnArbolBtn.setOnAction(e -> {
-                btnArbolBtn.setStyle(estiloNavActivo());
-                btnInv.setStyle(estiloNavInactivo());
-                btnEvBtn.setStyle(estiloNavInactivo());
+            btnArbolBtnCache.setOnAction(e -> {
+                btnArbolBtnCache.setStyle(estiloNavActivo());
+                btnInvCache.setStyle(estiloNavInactivo());
+                btnEvBtnCache.setStyle(estiloNavInactivo());
                 mostrarVistaArbol();
             });
-            btnEvBtn.setOnAction(e -> {
-                btnEvBtn.setStyle(estiloNavActivo());
-                btnInv.setStyle(estiloNavInactivo());
-                btnArbolBtn.setStyle(estiloNavInactivo());
-                mostrarVistaEvidencias();
+            btnEvBtnCache.setOnAction(e -> {
+                btnEvBtnCache.setStyle(estiloNavActivo());
+                btnInvCache.setStyle(estiloNavInactivo());
+                btnArbolBtnCache.setStyle(estiloNavInactivo());
+                mostrarVistaEvidencias(-1);
             });
 
-            VBox.setMargin(btnInv, new Insets(8, 0, 4, 0));
-            VBox.setMargin(btnArbolBtn, new Insets(0, 0, 4, 0));
-            panel.getChildren().addAll(vistasEtq, btnInv, btnArbolBtn, btnEvBtn);
+            VBox.setMargin(btnInvCache, new Insets(8, 0, 4, 0));
+            VBox.setMargin(btnArbolBtnCache, new Insets(0, 0, 4, 0));
+            panel.getChildren().addAll(vistasEtq, btnInvCache, btnArbolBtnCache, btnEvBtnCache);
             panel.getChildren().add(separador(14));
         }
 
@@ -295,7 +301,7 @@ public class AccionesNivel {
     // ════════════════════════════════════════════════
 
     private void mostrarVistaArbol() {
-        if (visualizadorArbol == null) visualizadorArbol = new VisualizadorArbol();
+        visualizadorArbol = obtenerVisualizadorArbol();
         visualizadorArbol.actualizar(controller.getArbol());
 
         Label titulo = new Label("Árbol AVL de Investigación");
@@ -324,12 +330,12 @@ public class AccionesNivel {
     //  VISTA: PANEL DE EVIDENCIAS
     // ════════════════════════════════════════════════
 
-    private void mostrarVistaEvidencias() {
+    private void mostrarVistaEvidencias(int casoIdParaPopup) {
         Label titulo = new Label("Panel de Evidencias");
         titulo.getStyleClass().add("titulo-nivel");
         Label sub = new Label(
                 "Evidencias recolectadas hasta el momento. " +
-                        "Cada ficha contiene la descripción completa de la prueba."
+                        "Haz clic en cualquier ficha para ver los datos técnicos forenses."
         );
         sub.getStyleClass().add("subtitulo"); sub.setWrapText(true);
 
@@ -349,6 +355,14 @@ public class AccionesNivel {
             }
         }
         setCentral(titulo, sub, fichas);
+
+        if (casoIdParaPopup != -1) {
+            // Find the instance and call the popup
+            Caso objetivo = casosEnArbol.stream().filter(c -> c.getId() == casoIdParaPopup).findFirst().orElse(
+                    (casoActual != null && casoActual.getId() == casoIdParaPopup) ? casoActual : null
+            );
+            if (objetivo != null) mostrarPopupEvidencia(objetivo);
+        }
     }
 
     private VBox construirFichaEvidencia(Caso caso, boolean cerrado) {
@@ -378,30 +392,115 @@ public class AccionesNivel {
         Region sep = new Region(); sep.setPrefHeight(1);
         sep.setStyle("-fx-background-color:#1e1e2e;");
 
-        Label evEtq = new Label("EVIDENCIAS");
-        evEtq.setStyle("-fx-font-size:10px;-fx-font-weight:600;-fx-text-fill:#3a3a5c;-fx-letter-spacing:0.1em;");
-        VBox evBox = new VBox(4);
-        for (String ev : caso.getEvidencias()) {
-            Label evLabel = new Label("◆  " + ev);
-            evLabel.setWrapText(true);
-            evLabel.setStyle("-fx-font-size:12px;-fx-text-fill:#c0c0d8;");
-            evBox.getChildren().add(evLabel);
-        }
-
-        ficha.getChildren().addAll(cab, descLabel, sep, evEtq, evBox);
+        ficha.getChildren().addAll(cab, descLabel, sep);
 
         if (cerrado) {
-            Region sep2 = new Region(); sep2.setPrefHeight(1);
-            sep2.setStyle("-fx-background-color:#1e1e2e;");
             Label leyLabel = new Label(caso.getLeyColombia());
             leyLabel.setWrapText(true);
             leyLabel.setStyle("-fx-font-size:12px;-fx-font-weight:600;-fx-text-fill:#00d4ff;");
             Label penaLabel = new Label("Pena: " + caso.getPenaAplicable());
             penaLabel.setWrapText(true);
             penaLabel.setStyle("-fx-font-size:12px;-fx-text-fill:#6b6b8a;");
-            ficha.getChildren().addAll(sep2, leyLabel, penaLabel);
+            ficha.getChildren().addAll(leyLabel, penaLabel);
         }
+        
+        Label lblClick = new Label("Haz clic para ver evidencia técnica");
+        lblClick.setStyle("-fx-font-size: 11px; -fx-text-fill: #00d4ff90; -fx-font-weight: 600;");
+        ficha.getChildren().add(lblClick);
+        
+        ficha.setStyle("-fx-background-color:#0f0f1a;-fx-border-color:" + (cerrado ? "#00d4ff30" : "#2a2a3c") + ";-fx-border-width:1;-fx-border-radius:10;-fx-background-radius:10;-fx-padding:16 20 16 20;-fx-cursor: hand;");
+        ficha.setOnMouseClicked(e -> mostrarPopupEvidencia(caso));
+
         return ficha;
+    }
+
+    private void mostrarPopupEvidencia(Caso caso) {
+        VBox overlayBg = new VBox();
+        overlayBg.setAlignment(Pos.CENTER);
+        overlayBg.setStyle("-fx-background-color: rgba(10, 10, 15, 0.95);");
+
+        HBox forensicCard = construirEvidenciaEspecifica(caso.getId());
+
+        VBox infoTarjeta = new VBox(8);
+        infoTarjeta.setStyle("-fx-background-color:#0f0f1a;-fx-border-color:#2a2a3c;-fx-border-width:1;-fx-border-radius:10;-fx-background-radius:10;-fx-padding:16 20;");
+
+        HBox cabecera = new HBox(12); cabecera.setAlignment(Pos.CENTER_LEFT);
+        Circle ind = new Circle(8);
+        ind.setFill(Color.web(caso.getGravedad() >= 7 ? "#ff0044" : (caso.getGravedad() >= 4 ? "#ff9f1c" : "#1a1a2a")));
+        ind.setStroke(Color.web("#3a3a5c")); ind.setStrokeWidth(1.5);
+        Label tit = new Label(caso.getTipoAcoso()); tit.getStyleClass().add("accion-titulo"); tit.setWrapText(true);
+        cabecera.getChildren().addAll(ind, tit);
+
+        Label desc = new Label(caso.getDescripcion());
+        desc.setStyle("-fx-font-size:13px;-fx-text-fill:#8080a8;-fx-wrap-text:true;");
+
+        infoTarjeta.getChildren().addAll(cabecera, desc);
+
+        boolean cerrado = controller.getArbol().recorridoInorden().stream().anyMatch(c -> c.getId() == caso.getId());
+        if (cerrado || (controller.getCasoActualFijo() != null && caso.getId() == controller.getCasoActualFijo().getId() && controller.todasLasEvidenciasReveladas())) {
+            Region sep = new Region(); sep.setPrefHeight(1); sep.setStyle("-fx-background-color:#1e1e2e;");
+            Label ley = new Label(caso.getLeyColombia());
+            ley.setStyle("-fx-font-size:12px;-fx-font-weight:600;-fx-text-fill:#00d4ff;"); ley.setWrapText(true);
+            Label pena = new Label("Pena: " + caso.getPenaAplicable());
+            pena.setStyle("-fx-font-size:12px;-fx-text-fill:#6b6b8a;"); pena.setWrapText(true);
+            infoTarjeta.getChildren().addAll(sep, ley, pena);
+        }
+
+        Button btnCerrar = new Button("✕");
+        btnCerrar.setStyle("-fx-background-color: transparent; -fx-text-fill: #ff4466; -fx-font-size: 22px; -fx-cursor: hand; -fx-padding: 0;");
+        btnCerrar.setOnAction(e -> stackCentral.getChildren().remove(overlayBg));
+
+        HBox topBar = new HBox(btnCerrar);
+        topBar.setAlignment(Pos.CENTER_RIGHT);
+        topBar.setPadding(new Insets(0, 0, 8, 0));
+
+        VBox content = new VBox(topBar, forensicCard, infoTarjeta);
+        VBox.setMargin(infoTarjeta, new Insets(14, 0, 0, 0));
+        content.setMaxWidth(680);
+        content.setAlignment(Pos.CENTER);
+
+        overlayBg.getChildren().add(content);
+        stackCentral.getChildren().add(overlayBg);
+
+        overlayBg.setOpacity(0);
+        FadeTransition ft = new FadeTransition(Duration.millis(250), overlayBg);
+        ft.setToValue(1); ft.play();
+    }
+
+    private HBox construirEvidenciaEspecifica(int casoId) {
+        String usuario = obtenerUsuarioSospechoso();
+        String dispositivo = obtenerDispositivoSospechoso();
+        String ip = obtenerIPSospechoso();
+
+        switch (casoId) {
+            case 1:
+                return construirEvidenciaConDatos("/images/evidencia_chat.png", "DATOS DEL CHAT CAPTURADO",
+                        new String[][]{{"Usuario",usuario},{"Plataforma","Red social NetCity"},
+                        {"Fecha","Hace 3 días, 10:47pm"},{"Dispositivo",dispositivo},
+                        {"Mensajes","14 mensajes ofensivos"},{"Estado","Cuenta activa"}},
+                        "Contenido censurado — solo datos técnicos visibles");
+            case 2:
+                return construirEvidenciaConDatos("/images/evidencia_post_falso.png", "METADATOS DE LA PUBLICACIÓN",
+                        new String[][]{{"Publicado por",usuario},{"Fecha","Martes, 10:03pm"},
+                        {"Plataforma","Foro NetCity"},{"Contenido","Información falsa [CENSURADO]"},
+                        {"Alcance","847 vistas, 134 compartidos"},{"Estado","Reportado 3 veces"}},
+                        "Contenido censurado por contener información falsa");
+            case 3:
+                return construirEvidenciaConDatos("/images/evidencia_perfil_falso.png", "DATOS FORENSES DEL PERFIL FALSO",
+                        new String[][]{{"IP creación",ip},{"Dispositivo",dispositivo},
+                        {"Fecha","Hace 5 días, 11:22pm"},{"Foto","Robada del perfil de Valeria"},
+                        {"Publicaciones","8 mensajes ofensivos en 5 días"},{"Estado","Suspendida por reporte"}},
+                        "Perfil suspendido — datos preservados para investigación");
+            case 4:
+                return construirEvidenciaConDatos("/images/evidencia_red_cuentas.png", "DASHBOARD FORENSE — ANÁLISIS DE CUENTAS",
+                        new String[][]{{"IP común",ip},{"Dispositivo",dispositivo},
+                        {"Cuentas","4 perfiles diferentes"},{"Horario","Ataques entre 9pm y 11pm"},
+                        {"Patrón","Mismo estilo de escritura"},{"Última acción","Hace 2 horas"}},
+                        "Datos extraídos del servidor de la plataforma");
+            default:
+                HBox h = new HBox(); h.getChildren().add(new Label("Evidencia para el caso " + casoId));
+                return h;
+        }
     }
 
     // ════════════════════════════════════════════════
@@ -669,6 +768,12 @@ public class AccionesNivel {
 
         VBox accion3 = crearTarjetaAccion("3. Identificar quién está detrás de la suplantación",
                 "Con la IP y el dispositivo identificados, ¿a quién le pertenece la cuenta falsa?", 2);
+
+        Label hintL3 = new Label("Recuerda revisar en los incidentes del árbol AVL y en las evidencias recolectadas que de pronto ahí se encuentra el nombre del usuario asociado a la IP y dispositivo.");
+        hintL3.setStyle("-fx-font-size:13px; -fx-text-fill:#e0e0f0; -fx-font-weight:bold; -fx-wrap-text:true;");
+        hintL3.setWrapText(true);
+        accion3.getChildren().add(hintL3);
+
         VBox opcionesS = new VBox(8);
         String sospReal = controller.getSospechoso();
         for (String s : getSospechososOrdenados()) {
@@ -747,6 +852,12 @@ public class AccionesNivel {
 
         VBox accion3 = crearTarjetaAccion("3. Identificar al responsable principal",
                 "Con todos los patrones y evidencias, ¿quién es el responsable?", 2);
+
+        Label hintL4 = new Label("Recuerda revisar en los incidentes del árbol AVL y en las evidencias recolectadas que de pronto ahí se encuentra el nombre del usuario asociado a la IP y dispositivo.");
+        hintL4.setStyle("-fx-font-size:13px; -fx-text-fill:#e0e0f0; -fx-font-weight:bold; -fx-wrap-text:true;");
+        hintL4.setWrapText(true);
+        accion3.getChildren().add(hintL4);
+
         VBox opcionesR = new VBox(8);
         String sospReal4 = controller.getSospechoso();
         for (String s : getSospechososOrdenados()) {
@@ -953,7 +1064,7 @@ public class AccionesNivel {
             return;
         }
 
-        if (visualizadorArbol == null) visualizadorArbol = new VisualizadorArbol();
+        visualizadorArbol = obtenerVisualizadorArbol();
         visualizadorArbol.actualizar(controller.getArbol());
 
         Label etqFase = new Label("✓  NODO INSERTADO EN EL ÁRBOL AVL");
@@ -994,7 +1105,7 @@ public class AccionesNivel {
 
     /** Paso 1: recorrer el árbol en inorden de forma interactiva. */
     private void mostrarRecorridoArbol() {
-        if (visualizadorArbol == null) visualizadorArbol = new VisualizadorArbol();
+        visualizadorArbol = obtenerVisualizadorArbol();
         visualizadorArbol.actualizar(controller.getArbol());
 
         Label titulo = new Label("Nivel Final – La verdad detrás del acoso");
@@ -1136,59 +1247,114 @@ public class AccionesNivel {
         }
     }
 
-    /** Paso 2: analizar nodos — reconstruir la línea de hechos. */
+    /** Paso 2: analizar los nodos — reconstruir la línea de hechos. */
     private void mostrarAnalisisNodos() {
-        Label titulo = new Label("Analizar los nodos del árbol");
+        // 1. Desordenamos los casos para que el usuario tenga que ordenarlos
+        List<Caso> casosDesordenadosPuzzle = new java.util.ArrayList<>(ordenCorrecto);
+        java.util.Collections.shuffle(casosDesordenadosPuzzle);
+
+        List<Caso> seleccionUsuario = new java.util.ArrayList<>();
+
+        Label titulo = new Label("Laboratorio Forense: Reconstrucción Temporal");
         titulo.getStyleClass().add("titulo-nivel");
-        Label sub = new Label(
-                "El recorrido inorden reveló el orden real de los delitos. " +
-                        "Analiza cada nodo para reconstruir la línea completa de hechos.");
-        sub.getStyleClass().add("subtitulo"); sub.setWrapText(true);
+        Label sub = new Label("Selecciona los incidentes en orden, desde el más antiguo (hace meses) hasta el más reciente (hoy).");
+        sub.getStyleClass().add("subtitulo");
 
-        Label etqLinea = etq("LÍNEA DE HECHOS — EN ORDEN DE GRAVEDAD");
-        VBox lineaHechos = new VBox(12);
+        VBox contenedorContenido = new VBox(20);
+        contenedorContenido.setStyle("-fx-padding: 0 20 0 0;");
 
-        for (int i = 0; i < ordenCorrecto.size(); i++) {
-            Caso c = ordenCorrecto.get(i);
-            HBox fila = new HBox(16); fila.setAlignment(Pos.TOP_LEFT);
+        FlowPane panelSeleccion = new FlowPane(15, 15);
+        panelSeleccion.setAlignment(Pos.TOP_LEFT);
 
-            VBox numBox = new VBox(); numBox.setAlignment(Pos.CENTER); numBox.setMinWidth(40);
-            Label numLabel = new Label(String.valueOf(i + 1));
-            numLabel.setStyle("-fx-font-family:'DM Mono';-fx-font-size:18px;-fx-font-weight:700;-fx-text-fill:#00d4ff;");
-            numBox.getChildren().add(numLabel);
+        VBox lineaTiempo = new VBox(10);
+        lineaTiempo.setStyle("-fx-background-color: #080810; -fx-padding: 20; -fx-border-color: #1e1e2e; -fx-border-radius: 12;");
 
-            VBox nodoCard = new VBox(6);
-            nodoCard.setStyle("-fx-background-color:#0f0f1a;-fx-border-color:#00d4ff25;" +
-                    "-fx-border-width:1;-fx-border-radius:10;-fx-background-radius:10;-fx-padding:14 18 14 18;");
-            HBox.setHgrow(nodoCard, Priority.ALWAYS);
+        actualizarPanelSeleccion(panelSeleccion, casosDesordenadosPuzzle, seleccionUsuario, lineaTiempo);
 
-            Label tipoL = new Label(c.getTipoAcoso());
-            tipoL.setStyle("-fx-font-size:14px;-fx-font-weight:600;-fx-text-fill:#e0e0f0;");
-            Label descL = new Label(c.getDescripcion()); descL.setWrapText(true);
-            descL.setStyle("-fx-font-size:12px;-fx-text-fill:#8080a0;");
-            Label leyL = new Label(c.getLeyColombia() + "  ·  Gravedad: " + c.getGravedad() + "/10");
-            leyL.setStyle("-fx-font-size:12px;-fx-font-weight:600;-fx-text-fill:#00d4ff;");
-            Label evL = new Label("Evidencia clave: " + c.getEvidencias()[0]); evL.setWrapText(true);
-            evL.setStyle("-fx-font-size:11px;-fx-text-fill:#5a5a7a;");
+        contenedorContenido.getChildren().addAll(
+                etq("PASO 1: ANALIZA LAS FECHAS Y SELECCIONA"),
+                panelSeleccion,
+                etq("PASO 2: LÍNEA DE TIEMPO RECONSTRUIDA"),
+                lineaTiempo
+        );
 
-            nodoCard.getChildren().addAll(tipoL, descL, leyL, evL);
-            fila.getChildren().addAll(numBox, nodoCard);
-            lineaHechos.getChildren().add(fila);
+        scrollCentral.setFitToWidth(true);
+        setCentral(titulo, sub, contenedorContenido);
+        labelMensajeAlex.setText("Analiza las fechas en las descripciones de las evidencias para determinar qué ocurrió primero.");
+    }
 
-            if (i < ordenCorrecto.size() - 1) {
-                Label flecha = new Label("     ↓");
-                flecha.setStyle("-fx-font-size:16px;-fx-text-fill:#2a2a4a;");
-                lineaHechos.getChildren().add(flecha);
-            }
+    private void actualizarPanelSeleccion(FlowPane panel, List<Caso> disponibles, List<Caso> seleccionados, VBox linea) {
+        panel.getChildren().clear();
+        linea.getChildren().clear();
+
+        // 1. Mostrar la Línea de Tiempo con NUMERACIÓN
+        for (int i = 0; i < seleccionados.size(); i++) {
+            Caso c = seleccionados.get(i);
+            HBox h = new HBox(15);
+            h.setAlignment(Pos.CENTER_LEFT);
+            h.setStyle("-fx-background-color: #0f0f1a; -fx-padding: 12; -fx-border-color: #00ff8840; -fx-border-radius: 8; -fx-margin: 5;");
+
+            Label num = new Label("#" + (i + 1));
+            num.setStyle("-fx-font-family: 'DM Mono'; -fx-text-fill: #00ff88; -fx-font-weight: bold;");
+
+            VBox info = new VBox(2);
+            Label t = new Label(c.getTipoAcoso());
+            t.setStyle("-fx-text-fill: #f0f0f8; -fx-font-weight: bold;");
+            
+            // Pistas temporales (usamos la primera evidencia que suele tener la fecha)
+            Label d = new Label(c.getEvidencias()[0]);
+            d.setStyle("-fx-text-fill: #6b6b8a; -fx-font-size: 11px;");
+
+            info.getChildren().addAll(t, d);
+            h.getChildren().addAll(num, info);
+            linea.getChildren().add(h);
         }
 
-        Button btnContinuar = new Button("Ver reporte final del caso →");
-        btnContinuar.getStyleClass().add("btn-primario");
-        btnContinuar.setOnAction(e -> mostrarReporteFinal());
-        HBox btnBox = new HBox(btnContinuar); btnBox.setAlignment(Pos.CENTER_RIGHT);
+        // 2. Mostrar "Tarjetas de Evidencia" para elegir
+        for (Caso c : disponibles) {
+            VBox tarjetaEvidencia = new VBox(8);
+            tarjetaEvidencia.setStyle("-fx-background-color: #161625; -fx-padding: 15; -fx-border-color: #2a2a3c; -fx-border-radius: 10; -fx-pref-width: 280;");
 
-        labelMensajeAlex.setText("Esta es la línea completa de los hechos. Lo que empezó como una 'broma' terminó en múltiples delitos reales.");
-        setCentral(titulo, sub, etqLinea, lineaHechos, btnBox);
+            Label etiqueta = new Label("EVIDENCIA SIN CLASIFICAR");
+            etiqueta.setStyle("-fx-font-size: 9px; -fx-text-fill: #5a5a7a; -fx-letter-spacing: 0.1em;");
+
+            VBox pistas = new VBox(4);
+            for(String evidencia : c.getEvidencias()) {
+                Label p = new Label("• " + evidencia);
+                p.setStyle("-fx-text-fill: #9090b0; -fx-font-size: 10px; -fx-wrap-text: true;");
+                p.setWrapText(true);
+                pistas.getChildren().add(p);
+            }
+
+            Button btnSeleccionar = new Button("Confirmar Posición #" + (seleccionados.size() + 1));
+            btnSeleccionar.setStyle(estiloBotonMonospace());
+            btnSeleccionar.setMaxWidth(Double.MAX_VALUE);
+
+            btnSeleccionar.setOnAction(e -> {
+                int siguienteCronologico = seleccionados.size() + 1;
+                if (c.getOrdenCronologico() == siguienteCronologico) {
+                    disponibles.remove(c);
+                    seleccionados.add(c);
+                    labelMensajeAlex.setText("¡Excelente! La marca de tiempo coincide con la progresión del caso.");
+                    actualizarPanelSeleccion(panel, disponibles, seleccionados, linea);
+
+                    if (disponibles.isEmpty()) {
+                        labelMensajeAlex.setText("Cronología completa. El historial de agresiones está listo para el reporte.");
+                        Button btnFin = new Button("Generar Reporte Final →");
+                        btnFin.getStyleClass().add("btn-primario");
+                        btnFin.setPadding(new Insets(15, 30, 15, 30));
+                        btnFin.setOnAction(ev -> mostrarReporteFinal());
+                        linea.getChildren().add(btnFin);
+                    }
+                } else {
+                    intentosFallidos++;
+                    labelMensajeAlex.setText("⚠ Error Cronológico: Ese evento no ocurrió en este punto. Revisa los meses/días.");
+                }
+            });
+
+            tarjetaEvidencia.getChildren().addAll(etiqueta, pistas, btnSeleccionar);
+            panel.getChildren().add(tarjetaEvidencia);
+        }
     }
 
     /** Paso 3: reporte global del caso. */
@@ -1338,6 +1504,19 @@ public class AccionesNivel {
     // ════════════════════════════════════════════════
     //  UTILIDADES
     // ════════════════════════════════════════════════
+
+    private VisualizadorArbol obtenerVisualizadorArbol() {
+        if (visualizadorArbol == null) {
+            visualizadorArbol = new VisualizadorArbol();
+            visualizadorArbol.setOnIrEvidencia(caso -> {
+                if (btnEvBtnCache != null) btnEvBtnCache.setStyle(estiloNavActivo());
+                if (btnInvCache != null) btnInvCache.setStyle(estiloNavInactivo());
+                if (btnArbolBtnCache != null) btnArbolBtnCache.setStyle(estiloNavInactivo());
+                mostrarVistaEvidencias(caso.getId());
+            });
+        }
+        return visualizadorArbol;
+    }
 
     private ImageView cargarImagen(String ruta, double ancho, double alto) {
         try {

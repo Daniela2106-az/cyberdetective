@@ -5,12 +5,11 @@ import cyberdetective.model.NodoAVL;
 import cyberdetective.model.Caso;
 import javafx.animation.FadeTransition;
 import javafx.animation.ScaleTransition;
-import javafx.geometry.Insets;
+import javafx.application.Platform;
 import javafx.geometry.Pos;
 import javafx.scene.canvas.Canvas;
 import javafx.scene.canvas.GraphicsContext;
-import javafx.scene.control.Label;
-import javafx.scene.control.ScrollPane;
+import javafx.scene.control.*;
 import javafx.scene.layout.*;
 import javafx.scene.paint.Color;
 import javafx.scene.text.Font;
@@ -21,31 +20,28 @@ import javafx.util.Duration;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Consumer;
 
 /**
- * Dibuja el árbol AVL visualmente sobre un Canvas.
- * Soporta clic en cada nodo para mostrar la información completa del caso.
- * Anima la entrada de nuevos nodos al insertarse.
+ * Clase que dibuja el árbol AVL de forma estética usando JavaFX Canvas.
  */
 public class VisualizadorArbol {
 
-    private Canvas canvas;
-    private GraphicsContext gc;
+    private final Canvas canvas;
+    private final GraphicsContext gc;
+    private Consumer<Caso> onIrEvidencia;
     private Popup popupNodo;
 
-    // Posiciones de cada nodo para detectar clics
-    private List<NodoPosicion> posicionesNodos = new ArrayList<>();
-
-    private static final double RADIO_NODO          = 28;
-    private static final double SEPARACION_VERTICAL  = 80;
-    private static final double ANCHO_CANVAS         = 1000;
+    // Configuración estética
+    private static final double RADIO_NODO         = 24;
+    private static final double ESPACIADO_V        = 60;
+    private static final double ANCHO_CANVAS        = 760;
     private static final double ALTO_CANVAS          = 240;
 
     private static final Color COLOR_FONDO      = Color.web("#0d0d16");
     private static final Color COLOR_ARISTA      = Color.web("#1e1e2e");
     private static final Color COLOR_NODO_FONDO  = Color.web("#12121c");
     private static final Color COLOR_NODO_BORDE  = Color.web("#00d4ff");
-    private static final Color COLOR_NODO_HOVER  = Color.web("#33ddff");
     private static final Color COLOR_TEXTO_ID    = Color.web("#f0f0f8");
     private static final Color COLOR_TEXTO_GRAV  = Color.web("#00d4ff");
     private static final Color COLOR_VACIO       = Color.web("#2a2a3c");
@@ -59,11 +55,17 @@ public class VisualizadorArbol {
         }
     }
 
+    private final List<NodoPosicion> posicionesNodos = new ArrayList<>();
+
     public VisualizadorArbol() {
         canvas = new Canvas(ANCHO_CANVAS, ALTO_CANVAS);
         gc = canvas.getGraphicsContext2D();
         dibujarVacio();
         configurarClickEnNodos();
+    }
+
+    public void setOnIrEvidencia(Consumer<Caso> callback) {
+        this.onIrEvidencia = callback;
     }
 
     public Canvas getCanvas() { return canvas; }
@@ -209,11 +211,21 @@ public class VisualizadorArbol {
                 "-fx-font-size: 10px; -fx-text-fill: #2a2a3c; -fx-font-style: italic;"
         );
 
+        javafx.scene.control.Button btnEvidencia = new javafx.scene.control.Button("Ir a la evidencia →");
+        btnEvidencia.setStyle("-fx-background-color: #00d4ff20; -fx-text-fill: #00d4ff; -fx-font-size: 11px; -fx-font-weight: 700; -fx-padding: 6 12; -fx-cursor: hand; -fx-border-color: #00d4ff60; -fx-border-radius: 4; -fx-background-radius: 4;");
+        btnEvidencia.setMaxWidth(Double.MAX_VALUE);
+        btnEvidencia.setOnAction(e -> {
+            if (popupNodo != null && popupNodo.isShowing()) popupNodo.hide();
+            if (onIrEvidencia != null) {
+                Platform.runLater(() -> onIrEvidencia.accept(caso));
+            }
+        });
+
         tarjeta.getChildren().addAll(
                 cabecera, tipoLabel, sep,
                 evEtiqueta, evBox, sep2,
                 leyEtiqueta, leyLabel, penaLabel,
-                hinLabel
+                btnEvidencia, hinLabel
         );
 
         // Animación de entrada
@@ -225,7 +237,7 @@ public class VisualizadorArbol {
         ft.setToValue(1);
         ft.play();
     }
-
+    
     // ── Dibujo del árbol ───────────────────────────────────────────────
 
     /**
@@ -249,14 +261,14 @@ public class VisualizadorArbol {
 
         if (nodo.getIzquierdo() != null) {
             double xH = x - offset;
-            double yH = y + SEPARACION_VERTICAL;
+            double yH = y + ESPACIADO_V;
             dibujarArista(x, y, xH, yH);
             dibujarArbol(nodo.getIzquierdo(), xH, yH, offset / 2);
         }
 
         if (nodo.getDerecho() != null) {
             double xH = x + offset;
-            double yH = y + SEPARACION_VERTICAL;
+            double yH = y + ESPACIADO_V;
             dibujarArista(x, y, xH, yH);
             dibujarArbol(nodo.getDerecho(), xH, yH, offset / 2);
         }
