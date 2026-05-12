@@ -15,10 +15,12 @@ import javafx.scene.shape.*;
 import javafx.stage.Stage;
 import javafx.util.Duration;
 
-public class MapaInvestigacion {
+public class MapaInvestigacion implements JuegoController.JuegoListener {
 
         private Stage stage;
         private JuegoController controller;
+        private Label labelEsperando;
+        private int nivelPendiente = -1;
 
         private static final double ANCHO = 1280;
         private static final double ALTO = 800;
@@ -57,21 +59,19 @@ public class MapaInvestigacion {
 
         public void mostrar() {
                 StackPane raiz = new StackPane();
-                raiz.setPrefSize(ANCHO, ALTO);
+                // Eliminamos setPrefSize para evitar que la ventana se reduzca
 
                 // Fondo
                 raiz.getChildren().add(construirFondo());
 
                 // Overlay oscuro
                 Region overlay = new Region();
-                overlay.setPrefSize(ANCHO, ALTO);
                 overlay.setStyle("-fx-background-color: rgba(8,8,14,0.58);");
                 overlay.setMouseTransparent(true);
                 raiz.getChildren().add(overlay);
 
-                // Pane del mapa — aquí van líneas y puntos
+                // Pane del mapa
                 Pane mapaPane = new Pane();
-                mapaPane.setPrefSize(ANCHO, ALTO);
                 mapaPane.setStyle("-fx-background-color: transparent;");
 
                 int nivelDesbloqueado = controller.isJuegoTerminado()
@@ -83,16 +83,37 @@ public class MapaInvestigacion {
 
                 raiz.getChildren().add(mapaPane);
 
+                // Etiqueta de espera
+                labelEsperando = new Label("ESPERANDO AL OTRO DETECTIVE...");
+                labelEsperando.setStyle("-fx-background-color: rgba(0,0,0,0.8); -fx-text-fill: #00d4ff; " +
+                        "-fx-padding: 20 40; -fx-font-weight: bold; -fx-border-color: #00d4ff; -fx-border-radius: 10; -fx-background-radius: 10;");
+                labelEsperando.setVisible(false);
+                StackPane.setAlignment(labelEsperando, Pos.CENTER);
+                raiz.getChildren().add(labelEsperando);
+                
+                controller.agregarListener(this);
+
                 // UI flotante encima — mouse transparent para no bloquear clics del mapa
                 HBox barraTop = construirBarraTop();
                 StackPane.setAlignment(barraTop, Pos.TOP_LEFT);
                 raiz.getChildren().add(barraTop);
 
-                Scene scene = new Scene(raiz, ANCHO, ALTO);
-                scene.getStylesheets().add(
-                                getClass().getResource("/styles.css").toExternalForm());
-                scene.setFill(Color.web("#08080e"));
-                stage.setScene(scene);
+                // Reutilizar la escena si ya existe
+                Scene scene = stage.getScene();
+                if (scene == null) {
+                        scene = new Scene(raiz);
+                        scene.getStylesheets().add(
+                                        getClass().getResource("/styles.css").toExternalForm());
+                        scene.setFill(Color.web("#08080e"));
+                        stage.setScene(scene);
+                } else {
+                        scene.setRoot(raiz);
+                }
+                
+                // Forzar pantalla completa con un pequeño retraso para asegurar que JavaFX ya procesó el cambio
+                javafx.application.Platform.runLater(() -> {
+                    stage.setFullScreen(true);
+                });
 
                 mapaPane.setOpacity(0);
                 FadeTransition ft = new FadeTransition(Duration.millis(700), mapaPane);
@@ -105,15 +126,16 @@ public class MapaInvestigacion {
                         Image img = new Image(
                                         getClass().getResourceAsStream("/images/mapa_fondo.png"));
                         ImageView iv = new ImageView(img);
-                        iv.setFitWidth(ANCHO);
-                        iv.setFitHeight(ALTO);
+                        // Hacemos que el fondo se adapte dinámicamente al tamaño de la ventana
+                        iv.fitWidthProperty().bind(stage.widthProperty());
+                        iv.fitHeightProperty().bind(stage.heightProperty());
                         iv.setPreserveRatio(false);
                         iv.setMouseTransparent(true);
                         return iv;
                 } catch (Exception e) {
                         ImageView iv = new ImageView();
-                        iv.setFitWidth(ANCHO);
-                        iv.setFitHeight(ALTO);
+                        iv.fitWidthProperty().bind(stage.widthProperty());
+                        iv.fitHeightProperty().bind(stage.heightProperty());
                         iv.setMouseTransparent(true);
                         return iv;
                 }
@@ -292,7 +314,6 @@ public class MapaInvestigacion {
                 barra.setPadding(new Insets(24, 28, 0, 32));
                 barra.setAlignment(Pos.CENTER_LEFT);
                 barra.setStyle("-fx-background-color: transparent;");
-                barra.setPrefWidth(ANCHO);
                 barra.setMaxHeight(Region.USE_PREF_SIZE);
 
                 // Info jugador — solo visual, no bloquea clics
@@ -367,9 +388,37 @@ public class MapaInvestigacion {
         }
 
         private void abrirNivel(int nivel) {
-                AccionesNivel acciones = new AccionesNivel(stage, controller, this);
-                acciones.mostrar(nivel);
+                if (controller instanceof cyberdetective.controller.MultiplayerJuegoController multi) {
+                        labelEsperando.setVisible(true);
+                        nivelPendiente = nivel;
+                        multi.notificarListoParaNivel(nivel);
+                } else {
+                        AccionesNivel acciones = new AccionesNivel(stage, controller, this);
+                        acciones.mostrar(nivel);
+                }
         }
+
+        @Override
+        public void onNivelIniciado() {
+                javafx.application.Platform.runLater(() -> {
+                        labelEsperando.setVisible(false);
+                        if (nivelPendiente != -1) {
+                                controller.removerListener(this); // Evitamos duplicados al volver
+                                AccionesNivel acciones = new AccionesNivel(stage, controller, this);
+                                acciones.mostrar(nivelPendiente);
+                                nivelPendiente = -1;
+                        }
+                });
+        }
+
+        // Métodos obligatorios de la interfaz JuegoListener (vacíos ya que no se usan en el mapa)
+        @Override public void onNivelCompletado(int nivel, cyberdetective.model.Caso caso) {}
+        @Override public void onArbolActualizado() {}
+        @Override public void onJuegoTerminado(String reporte) {}
+        @Override public void onPuntajeActualizado(int nuevoPuntaje) {}
+        @Override public void onMensajeDetective(String mensaje) {}
+        @Override public void onFaseCambiada(cyberdetective.controller.JuegoController.FaseNivel nuevaFase) {}
+        @Override public void onEvidenciaRevelada(String evidencia, int totalReveladas, int total) {}
 
         public void regresarAlMapa() {
                 mostrar();

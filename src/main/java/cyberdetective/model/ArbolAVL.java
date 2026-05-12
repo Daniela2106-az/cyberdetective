@@ -3,7 +3,7 @@ package cyberdetective.model;
 import java.util.ArrayList;
 import java.util.List;
 
-public class ArbolAVL {
+public class ArbolAVL implements java.io.Serializable {
 
     private NodoAVL raiz;
 

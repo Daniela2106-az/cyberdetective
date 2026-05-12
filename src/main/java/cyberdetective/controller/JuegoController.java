@@ -48,7 +48,7 @@ public class JuegoController {
     private String sospechosoDeLaPartida;
 
     // Oyentes de la vista
-    private List<JuegoListener> listeners;
+    protected List<JuegoListener> listeners;
 
     // ---------------- Constructor ----------------
     private String nombreJugador;
@@ -67,12 +67,19 @@ public class JuegoController {
         this.preguntaActual = 0;
         this.respuestasCorrectasNivel = 0;
 
-        int idx = (int)(Math.random() * SOSPECHOSOS.length);
-        this.sospechosoDeLaPartida = SOSPECHOSOS[idx];
-        NivelesData.setSospechoso(idx);
+        // Inicialmente vacío, se sincronizará vía setSospechoso
+        this.sospechosoDeLaPartida = "";
 
         logEventos.add("Investigación iniciada. El detective Alex toma el caso.");
         logEventos.add("Nivel 1 activo. Empieza a recolectar evidencias.");
+    }
+
+    public void setSospechoso(int idx) {
+        if (idx >= 0 && idx < NivelesData.PERFILES_SOSPECHOSOS.length) {
+            this.sospechosoDeLaPartida = NivelesData.PERFILES_SOSPECHOSOS[idx][0];
+            NivelesData.setSospechoso(idx);
+            logEventos.add("✓ Sospechoso sincronizado con el servidor: " + sospechosoDeLaPartida);
+        }
     }
 
     // ---------------- Listener ----------------
@@ -84,10 +91,31 @@ public class JuegoController {
         void onMensajeDetective(String mensaje);
         void onFaseCambiada(FaseNivel nuevaFase);
         void onEvidenciaRevelada(String evidencia, int totalReveladas, int total);
+        default void onRespuestaRecibida(int opcion, boolean correcta, String jugador) {}
+        default void onRespuestaOponente(String oponente, int opcion, boolean correcta) {}
+        default void onRespuestaIncorrecta(String jugador, int opcion, boolean soyYo) {}
+        default void onAmbosFallaron(int correcta) {}
+        
+        default void onAccionResuelta(int accionIdx, String jugador, boolean soyYo) {}
+        default void onAccionFallida(int accionIdx, String jugador, boolean soyYo) {}
+        default void onAccionAmbosFallaron(int accionIdx) {}
+        default void onNivelIniciado() {}
+        default void onAccionSincronizada(int accionIdx, String data) {}
+        default void onPuntajeOponenteActualizado(int puntaje) {}
+        default void onOponenteDesconectado(String nombre) {}
+        default void onArbolListoParaInsertar() {}
+        /** El servidor confirmó el ID del minijuego a usar en la pregunta qIdx. */
+        default void onMinijuegoIniciado(int gameId, int qIdx) {}
+        /** El servidor confirmó al ganador del minijuego de la pregunta qIdx. */
+        default void onMinijuegoResuelto(String ganador, int qIdx, boolean soyYo) {}
     }
 
     public void agregarListener(JuegoListener listener) {
         listeners.add(listener);
+    }
+
+    public void removerListener(JuegoListener listener) {
+        listeners.remove(listener);
     }
 
     // ---------------- Fase: Investigando ----------------
@@ -149,6 +177,35 @@ public class JuegoController {
         return evidenciasReveladas < evidenciasDescubiertas.size();
     }
 
+    /**
+     * Revela la siguiente evidencia SIN sumar puntos localmente.
+     * Para uso en multijugador donde el servidor es la fuente de verdad de los puntos.
+     */
+    public boolean revelarSiguienteEvidenciaSinPuntos() {
+        if (evidenciasReveladas >= evidenciasDescubiertas.size()) return false;
+
+        String ev = evidenciasDescubiertas.get(evidenciasReveladas);
+        evidenciasReveladas++;
+
+        // NO sumamos puntaje — el servidor lo calculará y enviará
+
+        logEventos.add("Evidencia " + evidenciasReveladas + " recolectada: " + ev);
+
+        String pista = NivelesData.getPistaAleatoria(nivelActual);
+        notificarMensajeDetective(pista);
+
+        notificarEvidenciaRevelada(ev, evidenciasReveladas, evidenciasDescubiertas.size());
+
+        if (evidenciasReveladas == evidenciasDescubiertas.size()) {
+            notificarMensajeDetective(
+                    "Alex dice: Bien. Ya tienes todas las evidencias. " +
+                            "Ahora responde el interrogatorio para cerrar el caso."
+            );
+        }
+
+        return evidenciasReveladas < evidenciasDescubiertas.size();
+    }
+
     public boolean todasLasEvidenciasReveladas() {
         return evidenciasReveladas >= evidenciasDescubiertas.size();
     }
@@ -193,6 +250,18 @@ public class JuegoController {
         return preguntaActual;
     }
 
+    /** Verifica si la opción es correcta sin avanzar el estado. */
+    public boolean esOpcionCorrecta(int opcionElegida) {
+        return opcionElegida == getOpcionCorrectaNivelActual();
+    }
+
+    public int getOpcionCorrectaNivelActual() {
+        String[][] preguntas = NivelesData.getPreguntasNivel(nivelActual);
+        if (preguntaActual >= preguntas.length) return -1;
+        String[] pregunta = preguntas[preguntaActual];
+        return Integer.parseInt(pregunta[pregunta.length - 1]);
+    }
+
     /**
      * Evalúa la respuesta del jugador.
      * La ley y el delito NO se muestran antes de esta fase.
@@ -207,24 +276,34 @@ public class JuegoController {
 
         if (esCorrecta) {
             respuestasCorrectasNivel++;
-            puntaje += 150;
+            puntaje += 50;
             logEventos.add("✓ Respuesta correcta – pregunta " + (preguntaActual + 1)
-                    + " del Nivel " + nivelActual + ". +150 pts.");
+                    + " del Nivel " + nivelActual + ". +50 pts.");
             notificarMensajeDetective(
                     "Alex dice: Correcto. Eso encaja con las evidencias recolectadas."
             );
         } else {
-            puntaje = Math.max(0, puntaje - 30);
+            puntaje = Math.max(0, puntaje - 25);
             logEventos.add("✗ Respuesta incorrecta – pregunta " + (preguntaActual + 1)
-                    + ". -30 pts.");
+                    + ". -25 pts.");
             notificarMensajeDetective(
                     "Alex dice: Eso no coincide. Revisa las evidencias y piénsalo mejor."
             );
         }
 
         notificarPuntaje();
+        
+        // Notificamos a la vista para que pueda pintar el resultado
+        for (JuegoListener l : listeners) {
+            l.onRespuestaRecibida(opcionElegida, esCorrecta, nombreJugador);
+        }
+        
         preguntaActual++;
         return esCorrecta;
+    }
+
+    public void avanzarPreguntaSinPuntaje() {
+        preguntaActual++;
     }
 
     public boolean hayMasPreguntas() {
@@ -378,6 +457,11 @@ public class JuegoController {
         notificarArbolActualizado();
         notificarPuntaje();
         notificarFaseCambiada(faseActual);
+    }
+
+    public void setPuntaje(int p) {
+        this.puntaje = p;
+        notificarPuntaje();
     }
 
     // ---------------- Notificaciones ----------------

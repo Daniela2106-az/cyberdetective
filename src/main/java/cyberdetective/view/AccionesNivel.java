@@ -1,6 +1,8 @@
 package cyberdetective.view;
 
 import cyberdetective.controller.JuegoController;
+import cyberdetective.minijuego.GestorMinijuegos;
+import cyberdetective.minijuego.Minijuego;
 import cyberdetective.model.Caso;
 import javafx.animation.*;
 import javafx.geometry.Insets;
@@ -30,7 +32,7 @@ import java.util.List;
  *   2. Analizar nodos / reconstruir la línea de hechos
  *   3. Reporte global del caso → regreso al mapa
  */
-public class AccionesNivel {
+public class AccionesNivel implements JuegoController.JuegoListener {
 
     private final Stage stage;
     private final JuegoController controller;
@@ -52,15 +54,20 @@ public class AccionesNivel {
     private VisualizadorArbol visualizadorArbol;
     private List<javafx.scene.Node> nodosAccionesCache;
     private StackPane stackCentral;
+    private Button btnEvBtnCache;
     private Button btnInvCache;
     private Button btnArbolBtnCache;
-    private Button btnEvBtnCache;
-
-    // Nivel final
+    private VBox[] tarjetasAcciones = new VBox[3];
+    private VBox opcionesBoxInterrogatorio;
     private List<Caso> ordenCorrecto;
     private List<Caso> casosDesordenados;
     private int siguienteCorrecto = 0;
     private int intentosFallidos  = 0;
+    
+    private Label labelPuntaje;
+    private Label labelPuntajeOponente;
+    private ProgressBar barraPuntajeYo;
+    private ProgressBar barraPuntajeOponente;
 
     public AccionesNivel(Stage stage, JuegoController controller,
                          MapaInvestigacion mapa) {
@@ -77,6 +84,7 @@ public class AccionesNivel {
         this.nivel = nivel;
         this.accionesCompletadas = new boolean[3];
         this.nodosAccionesCache = null;
+        controller.agregarListener(this);
         controller.iniciarInvestigacion();
 
         // Root fijo — la Scene no se recrea, evita cambios de tamaño
@@ -101,7 +109,7 @@ public class AccionesNivel {
         // Reutilizar la Scene existente, solo cambiar el root
         Scene scene = stage.getScene();
         if (scene == null) {
-            scene = new Scene(root, 1280, 800);
+            scene = new Scene(root);
             scene.getStylesheets().add(
                     getClass().getResource("/styles.css").toExternalForm()
             );
@@ -110,6 +118,7 @@ public class AccionesNivel {
         } else {
             scene.setRoot(root);
         }
+        stage.setFullScreen(true);
 
         if (nivel == 5) {
             mostrarNivelFinal();
@@ -151,13 +160,46 @@ public class AccionesNivel {
         panel.getChildren().addAll(appLabel, avatarBox, nombreLabel, rolLabel);
         panel.getChildren().add(separador(16));
 
-        // Puntaje
-        Label puntajeEtq = new Label("PUNTAJE");
+        // Puntajes
+        Label puntajeEtq = new Label("PUNTAJES");
         puntajeEtq.getStyleClass().add("etiqueta-seccion");
-        Label puntajeVal = new Label(String.valueOf(controller.getPuntaje()));
-        puntajeVal.getStyleClass().add("puntaje-label");
-        VBox.setMargin(puntajeVal, new Insets(4, 0, 0, 0));
-        panel.getChildren().addAll(puntajeEtq, puntajeVal);
+        
+        HBox scoreBox = new HBox(15);
+        scoreBox.setAlignment(Pos.CENTER_LEFT);
+        
+        // Tú
+        VBox myBox = new VBox(2);
+        Label myTitle = new Label("TÚ");
+        myTitle.setStyle("-fx-font-size: 9px; -fx-text-fill: #00d4ff; -fx-font-weight: bold;");
+        labelPuntaje = new Label(String.valueOf(controller.getPuntaje()));
+        labelPuntaje.getStyleClass().add("puntaje-label");
+        labelPuntaje.setStyle("-fx-font-size: 20px;");
+        barraPuntajeYo = new ProgressBar(Math.min(1.0, (double)controller.getPuntaje() / 1000.0));
+        barraPuntajeYo.setPrefWidth(80);
+        barraPuntajeYo.setPrefHeight(4);
+        barraPuntajeYo.setStyle("-fx-accent: #00d4ff;");
+        myBox.getChildren().addAll(myTitle, labelPuntaje, barraPuntajeYo);
+        
+        // Oponente
+        VBox opBox = new VBox(2);
+        Label opTitle = new Label("OPONENTE");
+        opTitle.setStyle("-fx-font-size: 9px; -fx-text-fill: #ff9f1c; -fx-font-weight: bold;");
+        labelPuntajeOponente = new Label("0");
+        labelPuntajeOponente.getStyleClass().add("puntaje-label");
+        labelPuntajeOponente.setStyle("-fx-font-size: 20px; -fx-text-fill: #ff9f1c;");
+        barraPuntajeOponente = new ProgressBar(0);
+        barraPuntajeOponente.setPrefWidth(80);
+        barraPuntajeOponente.setPrefHeight(4);
+        barraPuntajeOponente.setStyle("-fx-accent: #ff9f1c;");
+        opBox.getChildren().addAll(opTitle, labelPuntajeOponente, barraPuntajeOponente);
+        
+        Separator sep = new Separator(javafx.geometry.Orientation.VERTICAL);
+        sep.setStyle("-fx-background-color: #2a2a3c;");
+        
+        scoreBox.getChildren().addAll(myBox, sep, opBox);
+        VBox.setMargin(scoreBox, new Insets(8, 0, 0, 0));
+        
+        panel.getChildren().addAll(puntajeEtq, scoreBox);
         panel.getChildren().add(separador(14));
 
         // Progreso del detective
@@ -565,6 +607,8 @@ public class AccionesNivel {
         Label etq = new Label("ACCIONES DE INVESTIGACIÓN");
         etq.getStyleClass().add("etiqueta-seccion");
         contenedor.getChildren().add(etq);
+        
+        tarjetasAcciones = new VBox[3];
         switch (nivel) {
             case 1 -> contenedor.getChildren().addAll(construirAccionesNivel1());
             case 2 -> contenedor.getChildren().addAll(construirAccionesNivel2());
@@ -583,6 +627,7 @@ public class AccionesNivel {
 
         VBox accion1 = crearTarjetaAccion("1. Recolectar captura de pantalla",
                 "Haz clic en la captura para recolectarla como evidencia.", 0);
+        tarjetasAcciones[0] = accion1;
         HBox ev1 = construirEvidenciaConDatos("/images/evidencia_chat.png", "DATOS DEL CHAT CAPTURADO",
                 new String[][]{{"Usuario",usuario},{"Plataforma","Red social NetCity"},
                         {"Fecha","Hace 3 días, 10:47pm"},{"Dispositivo",dispositivo},
@@ -591,11 +636,12 @@ public class AccionesNivel {
         ev1.setStyle("-fx-cursor:hand;");
         ev1.setOnMouseClicked(e -> completarAccion(0, accion1,
                 "Captura recolectada. Usuario: " + usuario,
-                "Bien. La captura confirma al usuario. Guarda el nombre y el dispositivo."));
+                "Bien. La captura confirma al usuario. Guarda el nombre y el dispositivo.", true));
         accion1.getChildren().add(ev1); nodos.add(accion1);
 
         VBox accion2 = crearTarjetaAccion("2. Identificar el usuario agresor",
                 "Según la tarjeta de datos, ¿cuál es el usuario agresor?", 1);
+        tarjetasAcciones[1] = accion2;
         String[] usuarios = {"@val_amiga2025", usuario, "@random_user99", "@netcity_student"};
         mezclar(usuarios);
         HBox opcionesU = new HBox(10); opcionesU.setAlignment(Pos.CENTER_LEFT);
@@ -603,17 +649,25 @@ public class AccionesNivel {
             final boolean ok = u.equals(usuario);
             Button btn = new Button(u); btn.setStyle(estiloBotonMonospace());
             btn.setOnAction(e -> {
-                if (ok) {
-                    completarAccion(1, accion2, "Usuario confirmado: " + usuario,
-                            "Correcto. Ese usuario coincide con los datos de la captura.");
-                    opcionesU.getChildren().forEach(n -> { if (n instanceof Button b) b.setDisable(true); });
-                    btn.setStyle(estiloBotonMonospace() + "-fx-border-color:#00ff8860;-fx-text-fill:#00ff88;");
-                } else {
-                    btn.setStyle(estiloBotonMonospace() + "-fx-border-color:#ff004460;-fx-text-fill:#ff4466;");
-                    labelMensajeAlex.setText("Ese no es. Revisa el campo 'Usuario'.");
-                    PauseTransition p = new PauseTransition(Duration.millis(900));
-                    p.setOnFinished(ig -> btn.setStyle(estiloBotonMonospace())); p.play();
-                }
+                procesarAccionBoton(1, ok, opcionesU, btn, 
+                    () -> {
+                        completarAccion(1, accion2, "Usuario confirmado: " + usuario,
+                                "Correcto. Ese usuario coincide con los datos de la captura.", true);
+                        opcionesU.getChildren().forEach(n -> { if (n instanceof Button b) b.setDisable(true); });
+                        btn.setStyle(estiloBotonMonospace() + "-fx-border-color:#00ff8860;-fx-text-fill:#00ff88;");
+                    },
+                    tipoRes -> {
+                        completarAccionConTipo(1, accion2, "Usuario confirmado: " + usuario,
+                                tipoRes == 1 ? "Confirmado por el otro detective." : "Este era el usuario correcto.", tipoRes, false);
+                        // Buscar el correcto para pintarlo de verde a ambos
+                        for(javafx.scene.Node n : opcionesU.getChildren()) {
+                            if (n instanceof Button b && b.getText().equals(usuario)) {
+                                b.setStyle(estiloBotonMonospace() + "-fx-border-color:#00ff8860;-fx-text-fill:#00ff88;");
+                            }
+                        }
+                    },
+                    "Ese no es. Revisa el campo 'Usuario'."
+                );
             });
             opcionesU.getChildren().add(btn);
         }
@@ -621,6 +675,7 @@ public class AccionesNivel {
 
         VBox accion3 = crearTarjetaAccion("3. Clasificar el tipo de agresión",
                 "Según los mensajes y la ley colombiana, ¿qué tipo de agresión es esta?", 2);
+        tarjetasAcciones[2] = accion3;
         String[][] tipos = {
                 {"Injuria (Art. 220 C.P.) — Mensajes que ofenden el honor y afectan el buen nombre","correcto"},
                 {"Amenaza (Art. 347 C.P.) — Mensajes que generan miedo o anuncian un mal futuro","incorrecto"},
@@ -633,17 +688,24 @@ public class AccionesNivel {
             Button btn = new Button(tipo[0]);
             btn.getStyleClass().add("btn-opcion"); btn.setMaxWidth(Double.MAX_VALUE); btn.setWrapText(true);
             btn.setOnAction(e -> {
-                if (ok) {
-                    completarAccion(2, accion3, "Agresión: Injuria — Art. 220 C.P.",
-                            "Correcto. Los mensajes ofensivos reiterados son Injuria.");
-                    opcionesT.getChildren().forEach(n -> { if (n instanceof Button b) b.setDisable(true); });
-                    btn.getStyleClass().add("btn-opcion-correcto");
-                } else {
-                    btn.getStyleClass().add("btn-opcion-incorrecto");
-                    labelMensajeAlex.setText("No coincide. Los mensajes dañan el honor — eso es Injuria.");
-                    PauseTransition p = new PauseTransition(Duration.millis(900));
-                    p.setOnFinished(ig -> btn.getStyleClass().remove("btn-opcion-incorrecto")); p.play();
-                }
+                procesarAccionBoton(2, ok, opcionesT, btn,
+                    () -> {
+                        completarAccion(2, accion3, "Agresión: Injuria — Art. 220 C.P.",
+                                "Correcto. Los mensajes ofensivos reiterados son Injuria.", true);
+                        opcionesT.getChildren().forEach(n -> { if (n instanceof Button b) b.setDisable(true); });
+                        btn.getStyleClass().add("btn-opcion-correcto");
+                    },
+                    tipoRes -> {
+                        completarAccionConTipo(2, accion3, "Agresión: Injuria — Art. 220 C.P.",
+                                tipoRes == 1 ? "Confirmado por el otro detective." : "Esta era la respuesta correcta.", tipoRes, false);
+                        for(javafx.scene.Node n : opcionesT.getChildren()) {
+                            if (n instanceof Button b && b.getText().startsWith("Injuria")) {
+                                b.getStyleClass().add("btn-opcion-correcto");
+                            }
+                        }
+                    },
+                    "No coincide. Los mensajes dañan el honor — eso es Injuria."
+                );
             });
             opcionesT.getChildren().add(btn);
         }
@@ -659,6 +721,7 @@ public class AccionesNivel {
 
         VBox accion1 = crearTarjetaAccion("1. Identificar la publicación original",
                 "Examina el post y sus metadatos. Haz clic en la imagen para registrarla.", 0);
+        tarjetasAcciones[0] = accion1;
         HBox evPost = construirEvidenciaConDatos("/images/evidencia_post_falso.png",
                 "METADATOS DE LA PUBLICACIÓN",
                 new String[][]{{"Publicado por",usuario},{"Fecha","Martes, 10:03pm"},
@@ -668,11 +731,12 @@ public class AccionesNivel {
         evPost.setStyle("-fx-cursor:hand;");
         evPost.setOnMouseClicked(e -> completarAccion(0, accion1,
                 "Publicación identificada. Autor: " + usuario,
-                "Esa es la publicación que inició todo. Fíjate en quién la publicó."));
+                "Esa es la publicación que inició todo. Fíjate en quién la publicó.", true));
         accion1.getChildren().add(evPost); nodos.add(accion1);
 
         VBox accion2 = crearTarjetaAccion("2. Rastrear quién inició el rumor",
                 "Según los metadatos, ¿cuál es la cuenta que publicó el rumor primero?", 1);
+        tarjetasAcciones[1] = accion2;
         String[] autores = {"@compañero_random","@estudiante2025", usuario,"@netcity_oficial"};
         mezclar(autores);
         VBox opcionesA = new VBox(8);
@@ -683,7 +747,7 @@ public class AccionesNivel {
             btn.setOnAction(e -> {
                 if (ok) {
                     completarAccion(1, accion2, "Origen rastreado: " + usuario,
-                            "Confirmado. Los metadatos apuntan a esa cuenta.");
+                            "Confirmado. Los metadatos apuntan a esa cuenta.", true);
                     opcionesA.getChildren().forEach(n -> { if (n instanceof Button b) b.setDisable(true); });
                     btn.getStyleClass().add("btn-opcion-correcto");
                 } else {
@@ -699,13 +763,14 @@ public class AccionesNivel {
 
         VBox accion3 = crearTarjetaAccion("3. Determinar si es información falsa",
                 "Basado en las evidencias, ¿cuál es tu determinación legal?", 2);
+        tarjetasAcciones[2] = accion3;
         Button btnFalso = new Button("✗  Es información FALSA — constituye Calumnia (Art. 221 C.P.)");
         btnFalso.getStyleClass().add("btn-opcion"); btnFalso.setMaxWidth(Double.MAX_VALUE);
         Button btnVerdadero = new Button("✓  Es información verdadera — no constituye delito");
         btnVerdadero.getStyleClass().add("btn-opcion"); btnVerdadero.setMaxWidth(Double.MAX_VALUE);
         btnFalso.setOnAction(e -> {
             completarAccion(2, accion3, "Calumnia Art. 221 C.P.",
-                    "Correcto. Publicar información inventada que daña la reputación es Calumnia.");
+                    "Correcto. Publicar información inventada que daña la reputación es Calumnia.", true);
             btnFalso.getStyleClass().add("btn-opcion-correcto");
             btnVerdadero.setDisable(true); btnFalso.setDisable(true);
         });
@@ -728,6 +793,7 @@ public class AccionesNivel {
 
         VBox accion1 = crearTarjetaAccion("1. Analizar la información del perfil falso",
                 "Examina el perfil sospechoso. Los datos forenses están en la tarjeta.", 0);
+        tarjetasAcciones[0] = accion1;
         // Imagen nivel 3: evidencia_perfil_falso.png
         HBox evPerfil = construirEvidenciaConDatos("/images/evidencia_perfil_falso.png",
                 "DATOS FORENSES DEL PERFIL FALSO",
@@ -738,11 +804,12 @@ public class AccionesNivel {
         evPerfil.setStyle("-fx-cursor:hand;");
         evPerfil.setOnMouseClicked(e -> completarAccion(0, accion1,
                 "Perfil analizado. IP: " + ip,
-                "Todos los indicadores apuntan a suplantación. La IP es la clave."));
+                "Todos los indicadores apuntan a suplantación. La IP es la clave.", true));
         accion1.getChildren().add(evPerfil); nodos.add(accion1);
 
         VBox accion2 = crearTarjetaAccion("2. Rastrear la dirección IP de creación",
                 "El servidor registró estas IPs. ¿Cuál coincide con los datos forenses?", 1);
+        tarjetasAcciones[1] = accion2;
         String[] ips = {"192.168.100.22", ip, "10.10.10.1", "172.20.0.55"};
         mezclar(ips);
         HBox opcionesIP = new HBox(10); opcionesIP.setAlignment(Pos.CENTER_LEFT);
@@ -752,7 +819,7 @@ public class AccionesNivel {
             btn.setOnAction(e -> {
                 if (ok) {
                     completarAccion(1, accion2, "IP rastreada: " + ip,
-                            "Esa IP ya la vimos antes. Confirma quién creó la cuenta.");
+                            "Esa IP ya la vimos antes. Confirma quién creó la cuenta.", true);
                     opcionesIP.getChildren().forEach(n -> { if (n instanceof Button b) b.setDisable(true); });
                     btn.setStyle(estiloBotonIP() + "-fx-border-color:#00ff8860;-fx-text-fill:#00ff88;");
                 } else {
@@ -783,7 +850,7 @@ public class AccionesNivel {
             btn.setOnAction(e -> {
                 if (ok) {
                     completarAccion(2, accion3, "Sospechoso: " + sospReal,
-                            "Confirmado. IP y dispositivo apuntan a esta persona.");
+                            "Confirmado. IP y dispositivo apuntan a esta persona.", true);
                     opcionesS.getChildren().forEach(n -> { if (n instanceof Button b) b.setDisable(true); });
                     btn.getStyleClass().add("btn-opcion-correcto");
                 } else {
@@ -817,7 +884,7 @@ public class AccionesNivel {
         evRed.setStyle("-fx-cursor:hand;");
         evRed.setOnMouseClicked(e -> completarAccion(0, accion1,
                 "4 cuentas vinculadas a la IP: " + ip,
-                "Una sola IP detrás de 4 cuentas. Misma persona."));
+                "Una sola IP detrás de 4 cuentas. Misma persona.", true));
         accion1.getChildren().add(evRed); nodos.add(accion1);
 
         VBox accion2 = crearTarjetaAccion("2. Encontrar patrones de comportamiento",
@@ -836,7 +903,7 @@ public class AccionesNivel {
             btn.setOnAction(e -> {
                 if (ok) {
                     completarAccion(1, accion2, "Patrón: misma IP, dispositivo y horarios.",
-                            "Exacto. Ese patrón forense es la prueba más sólida.");
+                            "Exacto. Ese patrón forense es la prueba más sólida.", true);
                     opcionesP.getChildren().forEach(n -> { if (n instanceof Button b) b.setDisable(true); });
                     btn.getStyleClass().add("btn-opcion-correcto");
                 } else {
@@ -867,7 +934,7 @@ public class AccionesNivel {
             btn.setOnAction(e -> {
                 if (ok) {
                     completarAccion(2, accion3, "Responsable: " + sospReal4,
-                            "Tenemos evidencias para presentar todos los cargos.");
+                            "Tenemos evidencias para presentar todos los cargos.", true);
                     opcionesR.getChildren().forEach(n -> { if (n instanceof Button b) b.setDisable(true); });
                     btn.getStyleClass().add("btn-opcion-correcto");
                 } else {
@@ -887,28 +954,72 @@ public class AccionesNivel {
     //  COMPLETAR ACCIÓN
     // ════════════════════════════════════════════════
 
-    private void completarAccion(int indice, VBox tarjeta, String logMsg, String mensajeAlex) {
+    private void completarAccion(int indice, VBox tarjeta, String logMsg, String mensajeAlex, boolean notifyServer) {
+        completarAccionConTipo(indice, tarjeta, logMsg, mensajeAlex, 0, notifyServer);
+    }
+
+    private void completarAccionConTipo(int indice, VBox tarjeta, String logMsg, String mensajeAlex, int tipoResultado, boolean notifyServer) {
         if (accionesCompletadas[indice]) return;
         accionesCompletadas[indice] = true;
 
         tarjeta.getChildren().forEach(n -> {
             if (n instanceof HBox hb) hb.getChildren().forEach(c -> {
                 if (c instanceof Circle circ) {
-                    circ.setFill(Color.web("#00ff88")); circ.setStroke(Color.web("#00ff8860"));
+                    if (tipoResultado == 2) {
+                        circ.setFill(Color.web("#ff4466")); circ.setStroke(Color.web("#ff446660"));
+                    } else {
+                        circ.setFill(Color.web("#00ff88")); circ.setStroke(Color.web("#00ff8860"));
+                    }
                 }
             });
+            // Deshabilitar botones o cualquier nodo interactivo
+            n.setDisable(true);
+            if (tipoResultado != 0) {
+                n.setOpacity(0.5);
+            }
         });
+        tarjeta.setMouseTransparent(true);
         tarjeta.getStyleClass().remove("accion-card");
-        tarjeta.getStyleClass().add("accion-card-completada");
-        Label completadoLabel = new Label("✓  Completado");
-        completadoLabel.getStyleClass().add("accion-completada-label");
-        tarjeta.getChildren().add(completadoLabel);
+        
+        if (tipoResultado == 0) {
+            Label completadoLabel = new Label("✓  Completado");
+            tarjeta.getStyleClass().add("accion-card-completada");
+            completadoLabel.getStyleClass().add("accion-completada-label");
+            tarjeta.getChildren().add(completadoLabel);
+        } else if (tipoResultado == 1) {
+            tarjeta.setOpacity(0.5);
+            tarjeta.setStyle("-fx-border-color: #3a3a5c; -fx-background-color: #0d0d16; " +
+                            "-fx-border-width: 2; -fx-border-radius: 12; -fx-background-radius: 12;");
+            
+            Label lbl = new Label("OBJETIVO COMPLETADO POR TU COMPAÑERO");
+            lbl.setStyle("-fx-text-fill: #00d4ff; -fx-font-family: 'DM Mono'; -fx-font-size: 10px; -fx-font-weight: bold;");
+            
+            HBox box = new HBox(8, new Label("👤"), lbl);
+            box.setAlignment(Pos.CENTER_LEFT);
+            box.setStyle("-fx-padding: 8 12; -fx-background-color: rgba(0, 212, 255, 0.1); -fx-background-radius: 6;");
+            
+            tarjeta.getChildren().add(box);
+        } else if (tipoResultado == 2) {
+            tarjeta.setOpacity(0.5);
+            tarjeta.setStyle("-fx-border-color: #3a3a5c; -fx-background-color: #0d0d16; " +
+                            "-fx-border-width: 2; -fx-border-radius: 12; -fx-background-radius: 12;");
+            
+            Label lbl = new Label("NINGUNO RESPONDIÓ CORRECTAMENTE");
+            lbl.setStyle("-fx-text-fill: #ff4466; -fx-font-family: 'DM Mono'; -fx-font-size: 10px; -fx-font-weight: bold;");
+            
+            HBox box = new HBox(8, new Label("✗"), lbl);
+            box.setAlignment(Pos.CENTER_LEFT);
+            box.setStyle("-fx-padding: 8 12; -fx-background-color: rgba(255, 68, 102, 0.1); -fx-background-radius: 6;");
+            
+            tarjeta.getChildren().add(box);
+        }
 
         actualizarChecklist(indice);
         labelMensajeAlex.setText(mensajeAlex);
         controller.revelarSiguienteEvidencia();
 
-        FadeTransition ft = new FadeTransition(Duration.millis(300), completadoLabel);
+        javafx.scene.Node lastAdded = tarjeta.getChildren().get(tarjeta.getChildren().size() - 1);
+        FadeTransition ft = new FadeTransition(Duration.millis(300), lastAdded);
         ft.setFromValue(0); ft.setToValue(1); ft.play();
 
         boolean todasCompletas = true;
@@ -925,18 +1036,225 @@ public class AccionesNivel {
             });
             pausa.play();
         }
+
+        // RED: Notificar al servidor si somos nosotros quienes completamos la acción
+        if (notifyServer && controller instanceof cyberdetective.controller.MultiplayerJuegoController multi) {
+            multi.notificarAccionInvestigacion(indice, logMsg);
+        }
+    }
+
+    @Override
+    public void onAccionSincronizada(int accionIdx, String data) {
+        javafx.application.Platform.runLater(() -> {
+            if (accionIdx >= 0 && accionIdx < tarjetasAcciones.length) {
+                VBox tarjeta = tarjetasAcciones[accionIdx];
+                if (tarjeta != null) {
+                    marcarAccionOponente(accionIdx, tarjeta);
+                }
+            }
+        });
+    }
+
+    private void marcarAccionOponente(int index, VBox tarjeta) {
+        if (accionesCompletadas[index]) return;
+        accionesCompletadas[index] = true;
+
+        // Estilo bloqueado/opaco pero preservando contenido
+        tarjeta.getStyleClass().remove("accion-completada");
+        tarjeta.setMouseTransparent(true);
+        tarjeta.setOpacity(0.5);
+        tarjeta.setStyle("-fx-border-color: #3a3a5c; -fx-background-color: #0d0d16; " +
+                        "-fx-border-width: 2; -fx-border-radius: 12; -fx-background-radius: 12;");
+
+        // NO quitamos botones ni HBox, solo los deshabilitamos todos
+        tarjeta.getChildren().forEach(n -> n.setDisable(true));
+
+        Label lbl = new Label("OBJETIVO COMPLETADO POR TU COMPAÑERO");
+        lbl.setStyle("-fx-text-fill: #00d4ff; -fx-font-family: 'DM Mono'; -fx-font-size: 10px; -fx-font-weight: bold;");
+        
+        HBox box = new HBox(8, new Label("👤"), lbl);
+        box.setAlignment(Pos.CENTER_LEFT);
+        box.setStyle("-fx-padding: 8 12; -fx-background-color: rgba(0, 212, 255, 0.1); -fx-background-radius: 6;");
+        
+        // Lo añadimos al final sin borrar lo anterior
+        tarjeta.getChildren().add(box);
+        actualizarProgreso();
+    }
+
+    private void actualizarProgreso() {
+        int completadas = 0;
+        if (accionesCompletadas != null) {
+            for (boolean b : accionesCompletadas) if (b) completadas++;
+            double porcentaje = (double) completadas / accionesCompletadas.length;
+            if (barraProgreso != null) barraProgreso.setProgress(porcentaje);
+            if (labelProgreso != null) labelProgreso.setText("Objetivos: " + completadas + " / " + accionesCompletadas.length);
+            
+            if (completadas == accionesCompletadas.length && btnSiguiente != null) {
+                btnSiguiente.setDisable(false);
+            }
+        }
     }
 
     private void actualizarChecklist(int indice) {
-        if (panelAcciones == null) return;
-        if (panelAcciones.getChildren().size() > indice) {
+        if (panelAcciones != null && indice >= 0 && indice < panelAcciones.getChildren().size()) {
             javafx.scene.Node fila = panelAcciones.getChildren().get(indice);
-            if (fila instanceof HBox hb) hb.getChildren().forEach(n -> {
-                if (n instanceof Circle c) { c.setFill(Color.web("#00ff88")); c.setStroke(Color.web("#00ff8860")); }
-                if (n instanceof Label l) l.setStyle("-fx-font-size:12px;-fx-text-fill:#00ff88aa;");
-            });
+            if (fila instanceof HBox hb) {
+                hb.getChildren().forEach(n -> {
+                    if (n instanceof javafx.scene.shape.Circle c) {
+                        c.setFill(javafx.scene.paint.Color.web("#00ff88"));
+                    }
+                    if (n instanceof Label l) {
+                        l.setStyle("-fx-font-size:12px;-fx-text-fill:#00ff88; -fx-strikethrough: true;");
+                    }
+                });
+            }
         }
     }
+
+    @Override public void onNivelCompletado(int n, cyberdetective.model.Caso c) {}
+    @Override public void onArbolActualizado() {
+        if (visualizadorArbol != null) visualizadorArbol.actualizar(controller.getArbol());
+    }
+    @Override public void onJuegoTerminado(String r) {}
+    @Override public void onMensajeDetective(String m) {}
+    @Override public void onFaseCambiada(cyberdetective.controller.JuegoController.FaseNivel f) {}
+    @Override public void onEvidenciaRevelada(String e, int tr, int t) {
+        javafx.application.Platform.runLater(() -> {
+            barraProgreso.setProgress((double)tr / t);
+            labelProgreso.setText("Evidencias: " + tr + " / " + t);
+        });
+    }
+    @Override
+    public void onRespuestaRecibida(int opcion, boolean correcta, String jugador) {
+        // Capturamos los datos de la pregunta AQUÍ (síncronamente), ANTES del runLater.
+        // En este punto preguntaActual aún NO ha sido incrementado.
+        String[][] preguntas = controller.getPreguntasNivelActual();
+        int qIdx = controller.getPreguntaActual();
+        // Puede que ya se incrementó si el listener se llamó después del ++; tomamos el anterior
+        int safeIdx = (qIdx > 0 && qIdx >= preguntas.length) ? preguntas.length - 1 : qIdx;
+        String[] dataPregunta = preguntas[safeIdx];
+        int correctaIdx = Integer.parseInt(dataPregunta[dataPregunta.length - 1]);
+        String textoCorrecta = dataPregunta[correctaIdx + 1];
+
+        javafx.application.Platform.runLater(() -> {
+            if (opcionesBoxInterrogatorio == null) return;
+
+            // Deshabilitar todos los botones y marcar resultado
+            for (int i = 0; i < opcionesBoxInterrogatorio.getChildren().size(); i++) {
+                javafx.scene.Node n = opcionesBoxInterrogatorio.getChildren().get(i);
+                if (n instanceof Button btn) {
+                    btn.setDisable(true);
+                    if (i == correctaIdx) {
+                        btn.getStyleClass().removeAll("btn-opcion-incorrecto");
+                        btn.getStyleClass().add("btn-opcion-correcto");
+                    } else if (i == opcion && !correcta) {
+                        btn.getStyleClass().add("btn-opcion-incorrecto");
+                    }
+                }
+            }
+
+            if (correcta) {
+                labelMensajeAlex.setText("✓ ¡Correcto! +50 puntos.");
+                labelMensajeAlex.setStyle("-fx-text-fill: #00ff88; -fx-font-weight: bold;");
+            } else {
+                labelMensajeAlex.setText("✗ Incorrecto. −25 puntos. La respuesta era: " + textoCorrecta);
+                labelMensajeAlex.setStyle("-fx-text-fill: #ff4466; -fx-font-weight: bold;");
+            }
+
+            PauseTransition pausa = new PauseTransition(Duration.millis(2500));
+            pausa.setOnFinished(e -> {
+                labelMensajeAlex.setStyle("");
+                mostrarSiguientePregunta();
+            });
+            pausa.play();
+        });
+    }
+
+    @Override
+    public void onRespuestaIncorrecta(String jugador, int opcion, boolean soyYo) {
+        javafx.application.Platform.runLater(() -> {
+            if (opcionesBoxInterrogatorio != null) {
+                if (soyYo) {
+                    if (opcion >= 0 && opcion < opcionesBoxInterrogatorio.getChildren().size()) {
+                        javafx.scene.Node n = opcionesBoxInterrogatorio.getChildren().get(opcion);
+                        if (n instanceof Button btn) {
+                            btn.getStyleClass().add("btn-opcion-incorrecto");
+                        }
+                    }
+                    labelMensajeAlex.setText("✗ Respuesta incorrecta. Esperando al oponente...");
+                    labelMensajeAlex.setStyle("-fx-text-fill: #ff4466;");
+                } else {
+                    labelMensajeAlex.setText("⚡ ¡EL DETECTIVE " + jugador.toUpperCase() + " FALLÓ! TE TOCA.");
+                    labelMensajeAlex.setStyle("-fx-text-fill: #00d4ff; -fx-font-weight: bold;");
+                }
+            }
+        });
+    }
+
+    @Override
+    public void onAmbosFallaron(int correcta) {
+        javafx.application.Platform.runLater(() -> {
+            if (opcionesBoxInterrogatorio != null) {
+                for (int i = 0; i < opcionesBoxInterrogatorio.getChildren().size(); i++) {
+                    javafx.scene.Node n = opcionesBoxInterrogatorio.getChildren().get(i);
+                    if (n instanceof Button btn) {
+                        btn.setDisable(true);
+                        if (i == correcta) btn.getStyleClass().add("btn-opcion-correcto");
+                    }
+                }
+                labelMensajeAlex.setText("✗ Ambos fallaron. La respuesta correcta era la resaltada.");
+                labelMensajeAlex.setStyle("-fx-text-fill: #ff4466; -fx-font-weight: bold;");
+                
+                PauseTransition pausa = new PauseTransition(Duration.millis(3000));
+                pausa.setOnFinished(e -> {
+                    labelMensajeAlex.setStyle(""); 
+                    mostrarSiguientePregunta();
+                });
+                pausa.play();
+            }
+        });
+    }
+
+    @Override
+    public void onRespuestaOponente(String oponente, int opcion, boolean correcta) {
+        javafx.application.Platform.runLater(() -> {
+            if (opcionesBoxInterrogatorio != null) {
+                if (correcta) {
+                    // Si el oponente acertó, bloqueamos todo, mostramos mensaje y avanzamos
+                    for (javafx.scene.Node n : opcionesBoxInterrogatorio.getChildren()) {
+                        if (n instanceof Button b) {
+                            b.setDisable(true);
+                            b.setOpacity(0.3);
+                        }
+                    }
+                    labelMensajeAlex.setText("⚡ ¡EL DETECTIVE " + oponente.toUpperCase() + " SE ADELANTÓ Y ACERTÓ!");
+                    labelMensajeAlex.setStyle("-fx-text-fill: #ff9f1c; -fx-font-weight: bold;");
+                    
+                    PauseTransition pausa = new PauseTransition(Duration.millis(1500));
+                    pausa.setOnFinished(e -> {
+                        labelMensajeAlex.setStyle(""); 
+                        mostrarSiguientePregunta();
+                    });
+                    pausa.play();
+                } else {
+                    // Rebote: El oponente falló, avisamos al jugador local
+                    labelMensajeAlex.setText("⚡ ¡" + oponente.toUpperCase() + " FALLÓ! ES TU TURNO");
+                    labelMensajeAlex.setStyle("-fx-text-fill: #00d4ff; -fx-font-weight: bold;");
+                    
+                    // Aseguramos que nuestros botones (los que no hemos pulsado) estén activos
+                    for (javafx.scene.Node n : opcionesBoxInterrogatorio.getChildren()) {
+                        if (n instanceof Button b && !b.getStyleClass().contains("btn-opcion-incorrecto")) {
+                            b.setDisable(false);
+                            b.setOpacity(1.0);
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    @Override public void onNivelIniciado() {}
+
 
     // ════════════════════════════════════════════════
     //  FASE 2 — PREGUNTAS (niveles 1-4)
@@ -953,47 +1271,296 @@ public class AccionesNivel {
         String[][] preguntas = controller.getPreguntasNivelActual();
         int idx = controller.getPreguntaActual();
         String[] pregunta = preguntas[idx];
-        int totalOpciones = pregunta.length - 2;
 
         Label etqFase = new Label("INTERROGATORIO — FASE 2 DE 3");
         etqFase.setStyle("-fx-font-size:10px;-fx-font-weight:700;-fx-text-fill:#00d4ff;-fx-letter-spacing:0.12em;");
 
-        Label numP = new Label("PREGUNTA " + (idx+1) + " DE " + preguntas.length);
+        Label numP = new Label("PREGUNTA " + (idx + 1) + " DE " + preguntas.length);
         numP.setStyle("-fx-font-size:10px;-fx-font-weight:600;-fx-text-fill:#3a3a5c;-fx-letter-spacing:0.1em;");
 
         Label enunciado = new Label(pregunta[0]); enunciado.setWrapText(true);
         enunciado.setStyle("-fx-font-size:15px;-fx-font-weight:500;-fx-text-fill:#e0e0f0;-fx-line-spacing:4;");
         VBox.setMargin(enunciado, new Insets(8, 0, 12, 0));
 
-        VBox opcionesBox = new VBox(10);
-        for (int i = 1; i <= totalOpciones; i++) {
-            final int oi = i - 1;
-            Button btn = new Button(pregunta[i]);
-            btn.getStyleClass().add("btn-opcion"); btn.setMaxWidth(Double.MAX_VALUE); btn.setWrapText(true);
-            btn.setOnAction(e -> evaluarRespuesta(oi, opcionesBox, pregunta));
-            opcionesBox.getChildren().add(btn);
-        }
+        boolean multiplayer = (controller instanceof cyberdetective.controller.MultiplayerJuegoController);
 
-        VBox contenedor = new VBox(12);
+        VBox contenedor = new VBox(16);
         contenedor.setStyle("-fx-background-color:#0f0f1a;-fx-border-color:#1e1e2e;" +
                 "-fx-border-width:1;-fx-border-radius:12;-fx-background-radius:12;-fx-padding:24 28 24 28;");
-        contenedor.getChildren().addAll(numP, enunciado, opcionesBox);
+
+        if (multiplayer) {
+            // — Modo multijugador: botón que espera a ambos jugadores —
+            Label hint = new Label("⚠  Debes resolver un desafío para responder esta pregunta.");
+            hint.setStyle("-fx-text-fill:#6b6b8a;-fx-font-size:12px;");
+
+            Button btnDesafio = new Button("⚔  INICIAR DESAFÍo");
+            btnDesafio.getStyleClass().add("btn-primario");
+            btnDesafio.setMaxWidth(Double.MAX_VALUE);
+            btnDesafio.setOnAction(e -> {
+                btnDesafio.setDisable(true);
+                btnDesafio.setText("⏳ Esperando al otro detective...");
+                labelMensajeAlex.setText("Esperando a que el otro jugador esté listo para el desafío...");
+                cyberdetective.controller.MultiplayerJuegoController mc =
+                    (cyberdetective.controller.MultiplayerJuegoController) controller;
+                mc.enviarListoParaMinijuego(idx);
+            });
+
+            contenedor.getChildren().addAll(numP, enunciado, hint, btnDesafio);
+        } else {
+            // — Modo solitario: lanza el minijuego directamente —
+            Button btnDesafio = new Button("⚔  RESOLVER DESAFÍo");
+            btnDesafio.getStyleClass().add("btn-primario");
+            btnDesafio.setMaxWidth(Double.MAX_VALUE);
+            btnDesafio.setOnAction(e -> {
+                int gameId = GestorMinijuegos.seleccionarIdAleatorio(idx);
+                mostrarMinijuegoPopup(gameId, idx, false);
+            });
+            contenedor.getChildren().addAll(numP, enunciado, btnDesafio);
+        }
+
         setCentral(etqFase, contenedor);
     }
 
-    private void evaluarRespuesta(int opcionElegida, VBox opcionesBox, String[] pregunta) {
-        boolean correcto = controller.responderPregunta(opcionElegida);
-        int correcta = Integer.parseInt(pregunta[pregunta.length - 1]);
-        for (int i = 0; i < opcionesBox.getChildren().size(); i++) {
-            Button btn = (Button) opcionesBox.getChildren().get(i); btn.setDisable(true);
-            if (i == correcta) btn.getStyleClass().add("btn-opcion-correcto");
-            else if (i == opcionElegida && !correcto) btn.getStyleClass().add("btn-opcion-incorrecto");
+    /** Abre el popup del minijuego sobre la pantalla actual. */
+    private void mostrarMinijuegoPopup(int gameId, int qIdx, boolean multiplayer) {
+        Minijuego juego = GestorMinijuegos.crearMinijuego(gameId);
+
+        // — Título —
+        Label titulo = new Label("🎮  DESAFÍo: " + nombreDesafio(gameId));
+        titulo.setStyle("-fx-text-fill:#00d4ff;-fx-font-size:14px;-fx-font-weight:700;");
+
+        Label instruccion = new Label(instruccionDesafio(gameId));
+        instruccion.setStyle("-fx-text-fill:#9090b0;-fx-font-size:12px;");
+        instruccion.setWrapText(true);
+
+        VBox header = new VBox(4, titulo, instruccion);
+        header.setStyle("-fx-padding:16 20 0 20;");
+
+        VBox popupContent = new VBox(12, header, juego);
+        popupContent.setAlignment(Pos.TOP_CENTER);
+        popupContent.setStyle("-fx-background-color:#0d0d1a;-fx-border-color:#00d4ff40;" +
+                "-fx-border-width:2;-fx-border-radius:16;-fx-background-radius:16;-fx-padding:0 0 20 0;");
+        popupContent.setMaxWidth(700);
+        popupContent.setMaxHeight(560);
+
+        // — Overlay semitransparente —
+        StackPane overlay = new StackPane(popupContent);
+        overlay.setStyle("-fx-background-color:rgba(0,0,0,0.78);");
+        overlay.setPrefSize(stage.getWidth(), stage.getHeight());
+
+        // Insertar overlay sobre el stackCentral o el root
+        if (stackCentral != null) {
+            stackCentral.getChildren().add(overlay);
+        } else {
+            ((StackPane) root.getCenter()).getChildren().add(overlay);
         }
-        labelMensajeAlex.setText(correcto
-                ? "Correcto. Eso encaja con las evidencias recolectadas."
-                : "Eso no coincide. Revisa las evidencias.");
-        PauseTransition pausa = new PauseTransition(Duration.millis(1000));
-        pausa.setOnFinished(e -> mostrarSiguientePregunta()); pausa.play();
+
+        cyberdetective.controller.MultiplayerJuegoController mc =
+            (multiplayer && controller instanceof cyberdetective.controller.MultiplayerJuegoController)
+                ? (cyberdetective.controller.MultiplayerJuegoController) controller : null;
+
+        juego.setOnJuegoTerminado(tiempoMs -> {
+            javafx.application.Platform.runLater(() -> {
+                // Quitar overlay
+                if (stackCentral != null) stackCentral.getChildren().remove(overlay);
+                else ((StackPane) root.getCenter()).getChildren().remove(overlay);
+
+                if (mc != null) {
+                    // Multijugador: notificar al servidor y esperar MINIGAME_RESOLVED
+                    mc.enviarMinijuegoCompletado(qIdx, tiempoMs);
+                    labelMensajeAlex.setText("⏳ Desafío completado! Esperando al otro detective...");
+                } else {
+                    // Solitario: aplicar puntaje localmente y avanzar
+                    controller.responderPregunta(0); // fuerza pregunta correcta localmente
+                    mostrarSiguientePregunta();
+                }
+            });
+        });
+
+        juego.iniciar();
+    }
+
+    private String nombreDesafio(int id) {
+        switch (id) {
+            case 1: return "Escombros";
+            case 2: return "Escombros II";
+            case 3: return "Escombros III";
+            default: return "Desafío " + id;
+        }
+    }
+
+    private String instruccionDesafio(int id) {
+        switch (id) {
+            case 1: case 2: case 3:
+                return "Arrastra los escombros fuera del centro para descubrir la evidencia oculta. " +
+                       "¡Haz clic en la evidencia cuando quede despejada!";
+            default:
+                return "Resuelve el desafío para responder la pregunta.";
+        }
+    }
+
+    @Override
+    public void onMinijuegoIniciado(int gameId, int qIdx) {
+        javafx.application.Platform.runLater(() -> {
+            labelMensajeAlex.setText("⚔ ¡Desafío iniciado! ¡Sé el primero en resolver!");
+            mostrarMinijuegoPopup(gameId, qIdx, true);
+        });
+    }
+
+    @Override
+    public void onMinijuegoResuelto(String ganador, int qIdx, boolean soyYo) {
+        javafx.application.Platform.runLater(() -> {
+            if (soyYo) {
+                labelMensajeAlex.setText("★ ¡GANASTE el desafío! +50 puntos.");
+                labelMensajeAlex.setStyle("-fx-text-fill:#00ff88;-fx-font-weight:bold;");
+            } else {
+                labelMensajeAlex.setText("✖ " + ganador.toUpperCase() + " ganó el desafío. +0 puntos.");
+                labelMensajeAlex.setStyle("-fx-text-fill:#ff9f1c;-fx-font-weight:bold;");
+            }
+            PauseTransition pausa = new PauseTransition(Duration.millis(2500));
+            pausa.setOnFinished(e -> {
+                labelMensajeAlex.setStyle("");
+                mostrarSiguientePregunta();
+            });
+            pausa.play();
+        });
+    }
+
+    @Override
+    public void onAccionResuelta(int accionIdx, String jugador, boolean soyYo) {
+        javafx.application.Platform.runLater(() -> {
+            if (mapaOnCorrecto.containsKey(accionIdx)) {
+                if (soyYo) {
+                    mapaOnCorrecto.get(accionIdx).run();
+                } else {
+                    // Si fue el oponente, bloqueamos y marcamos la correcta
+                    if (mapaOpcionesBox.containsKey(accionIdx)) {
+                        for (javafx.scene.Node n : mapaOpcionesBox.get(accionIdx).getChildren()) {
+                            if (n instanceof Button b) {
+                                b.setDisable(true);
+                                b.setOpacity(0.5);
+                            }
+                        }
+                    }
+                    if (mapaOnSecundario.containsKey(accionIdx)) {
+                        mapaOnSecundario.get(accionIdx).accept(1); // 1 = Compañero
+                    }
+                    labelMensajeAlex.setText("⚡ ¡EL DETECTIVE " + jugador.toUpperCase() + " RESOLVIÓ LA ACCIÓN " + (accionIdx+1) + "!");
+                    labelMensajeAlex.setStyle("-fx-text-fill: #ff9f1c; -fx-font-weight: bold;");
+                }
+            }
+        });
+    }
+
+    @Override
+    public void onAccionFallida(int accionIdx, String jugador, boolean soyYo) {
+        javafx.application.Platform.runLater(() -> {
+            if (soyYo) {
+                if (mapaBtnElegido.containsKey(accionIdx)) {
+                    Button btn = mapaBtnElegido.get(accionIdx);
+                    btn.setStyle(btn.getStyle() + "-fx-border-color:#ff004460;-fx-text-fill:#ff4466;");
+                }
+                labelMensajeAlex.setText("✗ Acción incorrecta. Esperando al oponente...");
+                labelMensajeAlex.setStyle("-fx-text-fill: #ff4466;");
+            } else {
+                labelMensajeAlex.setText("⚡ ¡EL DETECTIVE " + jugador.toUpperCase() + " FALLÓ LA ACCIÓN! TE TOCA.");
+                labelMensajeAlex.setStyle("-fx-text-fill: #00d4ff; -fx-font-weight: bold;");
+            }
+        });
+    }
+
+    @Override
+    public void onAccionAmbosFallaron(int accionIdx) {
+        javafx.application.Platform.runLater(() -> {
+            if (mapaOpcionesBox.containsKey(accionIdx)) {
+                for (javafx.scene.Node n : mapaOpcionesBox.get(accionIdx).getChildren()) {
+                    if (n instanceof Button b) b.setDisable(true);
+                }
+            }
+            if (mapaOnSecundario.containsKey(accionIdx)) {
+                mapaOnSecundario.get(accionIdx).accept(2); // 2 = Ambos fallaron
+            }
+            labelMensajeAlex.setText("✗ Ambos fallaron la acción " + (accionIdx+1) + ". Se revela la correcta.");
+            labelMensajeAlex.setStyle("-fx-text-fill: #ff4466; -fx-font-weight: bold;");
+        });
+    }
+
+    @Override
+    public void onPuntajeActualizado(int p) {
+        javafx.application.Platform.runLater(() -> {
+            if (labelPuntaje != null) {
+                labelPuntaje.setText(String.valueOf(p));
+                barraPuntajeYo.setProgress(Math.min(1.0, (double)p / 1000.0));
+            }
+        });
+    }
+
+    @Override
+    public void onPuntajeOponenteActualizado(int p) {
+        javafx.application.Platform.runLater(() -> {
+            if (labelPuntajeOponente != null) {
+                labelPuntajeOponente.setText(String.valueOf(p));
+                barraPuntajeOponente.setProgress(Math.min(1.0, (double)p / 1000.0));
+            }
+        });
+    }
+
+    @Override
+    public void onOponenteDesconectado(String nombre) {
+        javafx.application.Platform.runLater(() -> {
+            Alert alert = new Alert(Alert.AlertType.WARNING);
+            alert.setTitle("Conexión perdida");
+            alert.setHeaderText("El detective " + nombre + " se ha desconectado.");
+            alert.setContentText("La investigación ya no puede continuar de forma sincronizada.");
+            alert.showAndWait();
+        });
+    }
+
+    @Override
+    public void onArbolListoParaInsertar() {
+        javafx.application.Platform.runLater(() -> mostrarFaseInsercion());
+    }
+
+    private java.util.Map<Integer, Runnable> mapaOnCorrecto = new java.util.HashMap<>();
+    private java.util.Map<Integer, java.util.function.IntConsumer> mapaOnSecundario = new java.util.HashMap<>();
+    private java.util.Map<Integer, javafx.scene.layout.Pane> mapaOpcionesBox = new java.util.HashMap<>();
+    private java.util.Map<Integer, Button> mapaBtnElegido = new java.util.HashMap<>();
+
+    private void procesarAccionBoton(int accionIdx, boolean esCorrecta, javafx.scene.layout.Pane opcionesBox, Button btnElegido, Runnable onCorrecto, java.util.function.IntConsumer onSecundario, String msgError) {
+        if (controller instanceof cyberdetective.controller.MultiplayerJuegoController mc) {
+            mapaOnCorrecto.put(accionIdx, onCorrecto);
+            mapaOnSecundario.put(accionIdx, onSecundario);
+            mapaOpcionesBox.put(accionIdx, opcionesBox);
+            
+            // Bloquear mis opciones
+            for (javafx.scene.Node n : opcionesBox.getChildren()) {
+                if (n instanceof Button b) b.setDisable(true);
+            }
+            mapaBtnElegido.put(accionIdx, btnElegido);
+            
+            labelMensajeAlex.setText("Validando acción con el cuartel...");
+            mc.intentarAccionInvestigacion(accionIdx, esCorrecta);
+        } else {
+            if (esCorrecta) {
+                onCorrecto.run();
+            } else {
+                btnElegido.setStyle(btnElegido.getStyle() + "-fx-border-color:#ff004460;-fx-text-fill:#ff4466;");
+                labelMensajeAlex.setText(msgError);
+                PauseTransition p = new PauseTransition(Duration.millis(900));
+                p.setOnFinished(ig -> {
+                    btnElegido.setStyle(btnElegido.getStyle().replace("-fx-border-color:#ff004460;-fx-text-fill:#ff4466;", ""));
+                });
+                p.play();
+            }
+        }
+    }
+
+    private void evaluarRespuesta(int opcionElegida, VBox opcionesBox, String[] pregunta) {
+        // En modo multijugador Y solitario, la respuesta se aplica de forma local.
+        // En multijugador: responderPregunta() ya no envía al servidor, aplica +50/-25 localmente.
+        // En solitario: idem, lógica base de JuegoController.
+        boolean correcto = controller.responderPregunta(opcionElegida);
+        // La UI se actualiza a través del listener onRespuestaRecibida disparado por JuegoController
     }
 
     // ════════════════════════════════════════════════
@@ -1043,7 +1610,16 @@ public class AccionesNivel {
 
         Button btnInsertar = new Button("Insertar nodo en el árbol AVL →");
         btnInsertar.getStyleClass().add("btn-primario");
-        btnInsertar.setOnAction(e -> mostrarFaseInsercion());
+        if (controller instanceof cyberdetective.controller.MultiplayerJuegoController mc) {
+            btnInsertar.setOnAction(e -> {
+                btnInsertar.setDisable(true);
+                btnInsertar.setText("⏳ Esperando al otro detective...");
+                labelMensajeAlex.setText("Esperando a que el otro detective termine el interrogatorio...");
+                mc.enviarListoParaArbol();
+            });
+        } else {
+            btnInsertar.setOnAction(e -> mostrarFaseInsercion());
+        }
         HBox btnBox = new HBox(btnInsertar); btnBox.setAlignment(Pos.CENTER_RIGHT);
 
         labelMensajeAlex.setText("Resumen completo. Cuando estés listo, inserta el nodo en el árbol AVL.");

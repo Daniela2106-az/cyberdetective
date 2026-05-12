@@ -32,6 +32,7 @@ public class PantallaJuego implements JuegoController.JuegoListener {
 
     // ── Panel lateral ──────────────────────────────
     private Label labelPuntaje;
+    private Label labelPuntajeOponente;
     private Label labelNivelBadge;
     private Label labelMensajeDetective;
     private TextArea logArea;
@@ -59,6 +60,7 @@ public class PantallaJuego implements JuegoController.JuegoListener {
     private Vista vistaActiva = Vista.INVESTIGACION;
 
     private MapaInvestigacion mapa;
+    private VBox opcionesBox;
 
     public PantallaJuego(Stage stage, JuegoController controller) {
         this.stage = stage;
@@ -132,12 +134,35 @@ public class PantallaJuego implements JuegoController.JuegoListener {
         panel.getChildren().add(separador(20));
 
         // Puntaje
-        Label puntajeEtq = new Label("PUNTAJE");
+        Label puntajeEtq = new Label("PUNTAJES");
         puntajeEtq.getStyleClass().add("etiqueta-seccion");
+        
+        HBox scoreBox = new HBox(12);
+        scoreBox.setAlignment(Pos.CENTER_LEFT);
+        
+        VBox myScore = new VBox(2);
+        Label myLabel = new Label("TÚ");
+        myLabel.setStyle("-fx-font-size: 10px; -fx-text-fill: #00d4ff; -fx-font-weight: bold;");
         labelPuntaje = new Label("0");
         labelPuntaje.getStyleClass().add("puntaje-label");
-        VBox.setMargin(labelPuntaje, new Insets(4, 0, 0, 0));
-        panel.getChildren().addAll(puntajeEtq, labelPuntaje);
+        labelPuntaje.setStyle("-fx-font-size: 24px;");
+        myScore.getChildren().addAll(myLabel, labelPuntaje);
+        
+        VBox opponentScore = new VBox(2);
+        Label opLabel = new Label("OPONENTE");
+        opLabel.setStyle("-fx-font-size: 10px; -fx-text-fill: #ff9f1c; -fx-font-weight: bold;");
+        labelPuntajeOponente = new Label("0");
+        labelPuntajeOponente.getStyleClass().add("puntaje-label");
+        labelPuntajeOponente.setStyle("-fx-font-size: 24px; -fx-text-fill: #ff9f1c;");
+        opponentScore.getChildren().addAll(opLabel, labelPuntajeOponente);
+        
+        Separator sep = new Separator(javafx.geometry.Orientation.VERTICAL);
+        sep.setStyle("-fx-background-color: #2a2a3c;");
+        
+        scoreBox.getChildren().addAll(myScore, sep, opponentScore);
+        
+        VBox.setMargin(scoreBox, new Insets(8, 0, 0, 0));
+        panel.getChildren().addAll(puntajeEtq, scoreBox);
         panel.getChildren().add(separador(20));
 
         // Nivel activo
@@ -574,7 +599,7 @@ public class PantallaJuego implements JuegoController.JuegoListener {
         );
         VBox.setMargin(enunciado, new Insets(8, 0, 12, 0));
 
-        VBox opcionesBox = new VBox(8);
+        opcionesBox = new VBox(8);
         for (int i = 1; i <= totalOpciones; i++) {
             final int opcionIdx = i - 1;
             Button btn = new Button(pregunta[i]);
@@ -591,21 +616,18 @@ public class PantallaJuego implements JuegoController.JuegoListener {
 
     private void evaluarRespuesta(int opcionElegida, VBox opcionesBox,
                                   String[] pregunta) {
-        boolean correcto = controller.responderPregunta(opcionElegida);
-        int correcta = Integer.parseInt(pregunta[pregunta.length - 1]);
-
-        for (int i = 0; i < opcionesBox.getChildren().size(); i++) {
-            Button btn = (Button) opcionesBox.getChildren().get(i);
-            btn.setDisable(true);
-            if (i == correcta)               btn.getStyleClass().add("btn-opcion-correcto");
-            else if (i == opcionElegida && !correcto) btn.getStyleClass().add("btn-opcion-incorrecto");
+        // En multijugador, el controlador enviará el mensaje y devolverá false.
+        // En solitario, devolverá el resultado pero ahora lo manejaremos en onRespuestaRecibida.
+        controller.responderPregunta(opcionElegida);
+        
+        // Bloqueamos todo inmediatamente para evitar clics múltiples
+        for (Node n : opcionesBox.getChildren()) {
+            if (n instanceof Button btn) {
+                btn.setDisable(true);
+            }
         }
-
+        
         actualizarLog();
-
-        PauseTransition pausa = new PauseTransition(Duration.millis(900));
-        pausa.setOnFinished(e -> cargarPregunta());
-        pausa.play();
     }
 
     // ── Veredicto y tarjeta del nodo ──────────────
@@ -1433,6 +1455,132 @@ public class PantallaJuego implements JuegoController.JuegoListener {
     public void onMensajeDetective(String msg) {
         Platform.runLater(() -> labelMensajeDetective.setText(msg));
     }
+
+    @Override
+    public void onRespuestaRecibida(int opcion, boolean correcta, String jugador) {
+        Platform.runLater(() -> {
+            if (opcionesBox != null) {
+                String[][] preguntas = controller.getPreguntasNivelActual();
+                int qIdx = controller.getPreguntaActual();
+                
+                // Si ya avanzó el índice (en modo solitario), retrocedemos uno para buscar la correcta
+                // Pero como onRespuestaRecibida se llama ANTES de avanzar en solitario ahora, 
+                // o el índice ya es el correcto según la lógica.
+                // Buscamos la respuesta correcta en la data actual.
+                String[] dataPregunta = preguntas[Math.min(qIdx, preguntas.length - 1)];
+                int correctaIdx = Integer.parseInt(dataPregunta[dataPregunta.length - 1]);
+
+                for (int i = 0; i < opcionesBox.getChildren().size(); i++) {
+                    Node n = opcionesBox.getChildren().get(i);
+                    if (n instanceof Button btn) {
+                        btn.setDisable(true);
+                        if (i == correctaIdx) {
+                            btn.getStyleClass().add("btn-opcion-correcto");
+                        } else if (i == opcion && !correcta) {
+                            btn.getStyleClass().add("btn-opcion-incorrecto");
+                        }
+                    }
+                }
+
+                PauseTransition pausa = new PauseTransition(Duration.millis(1200));
+                pausa.setOnFinished(e -> cargarPregunta());
+                pausa.play();
+            }
+        });
+    }
+
+    @Override
+    public void onRespuestaOponente(String oponente, int opcion, boolean correcta) {
+        Platform.runLater(() -> {
+            if (opcionesBox != null) {
+                for (Node n : opcionesBox.getChildren()) {
+                    if (n instanceof Button b) {
+                        b.setDisable(true);
+                        b.setOpacity(0.5);
+                    }
+                }
+                Label aviso = new Label("¡EL DETECTIVE " + oponente.toUpperCase() + " SE ADELANTÓ!");
+                aviso.setStyle("-fx-text-fill: #ff6b6b; -fx-font-weight: bold; -fx-font-size: 14px;");
+                panelFase.getChildren().add(aviso);
+                
+                // Esperar un momento y pasar a la siguiente
+                PauseTransition pausa = new PauseTransition(Duration.millis(1500));
+                pausa.setOnFinished(e -> cargarPregunta());
+                pausa.play();
+            }
+        });
+    }
+
+    @Override
+    public void onRespuestaIncorrecta(String jugador, int opcion, boolean soyYo) {
+        Platform.runLater(() -> {
+            if (opcionesBox != null) {
+                if (soyYo) {
+                    // Marcar en rojo mi respuesta incorrecta
+                    if (opcion >= 0 && opcion < opcionesBox.getChildren().size()) {
+                        Node n = opcionesBox.getChildren().get(opcion);
+                        if (n instanceof Button btn) {
+                            btn.getStyleClass().add("btn-opcion-incorrecto");
+                        }
+                    }
+                    Label aviso = new Label("¡Respuesta incorrecta! Esperando al otro detective...");
+                    aviso.setStyle("-fx-text-fill: #ff6b6b; -fx-font-weight: bold; -fx-font-size: 14px;");
+                    panelFase.getChildren().add(aviso);
+                } else {
+                    // El otro falló, avisamos
+                    Label aviso = new Label("¡EL DETECTIVE " + jugador.toUpperCase() + " FALLÓ! TE TOCA.");
+                    aviso.setStyle("-fx-text-fill: #ff9f1c; -fx-font-weight: bold; -fx-font-size: 12px;");
+                    panelFase.getChildren().add(aviso);
+                }
+            }
+        });
+    }
+
+    @Override
+    public void onAmbosFallaron(int correcta) {
+        Platform.runLater(() -> {
+            if (opcionesBox != null) {
+                // Deshabilitar todo y resaltar correcta
+                for (int i = 0; i < opcionesBox.getChildren().size(); i++) {
+                    Node n = opcionesBox.getChildren().get(i);
+                    if (n instanceof Button btn) {
+                        btn.setDisable(true);
+                        if (i == correcta) {
+                            btn.getStyleClass().add("btn-opcion-correcto");
+                        }
+                    }
+                }
+                Label aviso = new Label("¡AMBOS FALLARON! LA RESPUESTA ERA LA RESALTADA.");
+                aviso.setStyle("-fx-text-fill: #ff4444; -fx-font-weight: bold; -fx-font-size: 14px;");
+                panelFase.getChildren().add(aviso);
+                
+                PauseTransition pausa = new PauseTransition(Duration.millis(3000));
+                pausa.setOnFinished(e -> cargarPregunta());
+                pausa.play();
+            }
+        });
+    }
+
+    @Override
+    public void onPuntajeOponenteActualizado(int puntaje) {
+        Platform.runLater(() -> {
+            if (labelPuntajeOponente != null) {
+                labelPuntajeOponente.setText(String.valueOf(puntaje));
+            }
+        });
+    }
+
+    @Override
+    public void onOponenteDesconectado(String nombre) {
+        Platform.runLater(() -> {
+            Alert alert = new Alert(Alert.AlertType.WARNING);
+            alert.setTitle("Conexión perdida");
+            alert.setHeaderText("El detective " + nombre + " se ha desconectado.");
+            alert.setContentText("La investigación ya no puede continuar de forma sincronizada.");
+            alert.showAndWait();
+        });
+    }
+
 
     // ── Estilos de navegación ──────────────────────
 

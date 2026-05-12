@@ -1,6 +1,6 @@
 package cyberdetective.model;
 
-public class NodoAVL {
+public class NodoAVL implements java.io.Serializable {
 
     Caso caso;
     NodoAVL izquierdo;

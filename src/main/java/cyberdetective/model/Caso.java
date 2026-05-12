@@ -1,6 +1,6 @@
 package cyberdetective.model;
 
-public class Caso {
+public class Caso implements java.io.Serializable {
 
     private int id;
     private String tipoAcoso;

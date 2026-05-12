@@ -12,8 +12,13 @@ public class Main extends Application {
 
     @Override
     public void start(Stage stage) {
+        stage.setFullScreen(true);
+        stage.setFullScreenExitHint(""); // Quita el mensaje de "Presione ESC para salir"
+        
         MenuPrincipal menu = new MenuPrincipal(stage);
         menu.mostrar();
+        
+        stage.show();
     }
 
     public static void main(String[] args) {

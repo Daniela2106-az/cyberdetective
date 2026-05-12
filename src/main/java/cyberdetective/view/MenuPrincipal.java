@@ -36,17 +36,21 @@ public class MenuPrincipal {
         VBox contenido = construirContenido();
         fondo.getChildren().add(contenido);
 
-        Scene scene = new Scene(root, 1100, 720);
-        scene.getStylesheets().add(
+        // Reutilizar la escena si ya existe
+        Scene scene = stage.getScene();
+        if (scene == null) {
+            scene = new Scene(root);
+            scene.getStylesheets().add(
                 getClass().getResource("/styles.css").toExternalForm()
-        );
-        scene.setFill(Color.web("#0a0a0f"));
+            );
+            scene.setFill(Color.web("#0a0a0f"));
+            stage.setScene(scene);
+        } else {
+            scene.setRoot(root);
+        }
 
         stage.setTitle("CyberDetective – El Árbol de la Verdad");
-        stage.setScene(scene);
-        stage.setMinWidth(900);
-        stage.setMinHeight(600);
-        stage.show();
+        stage.setFullScreen(true);
 
         animarEntrada(contenido);
     }
@@ -112,6 +116,19 @@ public class MenuPrincipal {
         btnJugar.setPrefWidth(240);
         btnJugar.setOnAction(e -> iniciarJuego());
 
+        Button btnHost = new Button("Crear Investigación (Host)");
+        btnHost.getStyleClass().add("btn-primario");
+        btnHost.setStyle("-fx-background-color: linear-gradient(to right, #6a11cb, #2575fc);");
+        btnHost.setPrefWidth(240);
+        btnHost.setOnAction(e -> iniciarLobby(true));
+        VBox.setMargin(btnHost, new Insets(12, 0, 0, 0));
+
+        Button btnUnirse = new Button("Unirse a Investigación");
+        btnUnirse.getStyleClass().add("btn-secundario");
+        btnUnirse.setPrefWidth(240);
+        btnUnirse.setOnAction(e -> iniciarLobby(false));
+        VBox.setMargin(btnUnirse, new Insets(8, 0, 0, 0));
+
         Button btnAyuda = new Button("¿Cómo funciona?");
         btnAyuda.getStyleClass().add("btn-secundario");
         btnAyuda.setPrefWidth(240);
@@ -121,7 +138,7 @@ public class MenuPrincipal {
 
         contenido.getChildren().addAll(
                 etiqueta, tituloBox, subtitulo,
-                historia, btnJugar, btnAyuda
+                historia, btnJugar, btnHost, btnUnirse, btnAyuda
         );
 
         return contenido;
@@ -228,6 +245,11 @@ public class MenuPrincipal {
     private void iniciarJuego() {
         PantallaInicio inicio = new PantallaInicio(stage);
         inicio.mostrar();
+    }
+
+    private void iniciarLobby(boolean isHosting) {
+        PantallaLobby lobby = new PantallaLobby(stage, isHosting);
+        lobby.mostrar();
     }
 
     // Entrada suave al abrir el menú

@@ -34,13 +34,20 @@ public class PantallaInicio {
         VBox contenido = construirContenido();
         root.setCenter(contenido);
 
-        Scene scene = new Scene(root, 1280, 800);
-        scene.getStylesheets().add(
+        // Reutilizar la escena si ya existe
+        Scene scene = stage.getScene();
+        if (scene == null) {
+            scene = new Scene(root);
+            scene.getStylesheets().add(
                 getClass().getResource("/styles.css").toExternalForm()
-        );
-        scene.setFill(Color.web("#0a0a0f"));
-        stage.setScene(scene);
-
+            );
+            scene.setFill(Color.web("#0a0a0f"));
+            stage.setScene(scene);
+        } else {
+            scene.setRoot(root);
+        }
+        
+        stage.setFullScreen(true);
         animarEntrada(contenido);
     }
 
@@ -212,6 +219,10 @@ public class PantallaInicio {
 
     private void iniciarJuego(String nombreJugador) {
         JuegoController controller = new JuegoController(nombreJugador);
+        // Elegir sospechoso al azar para modo solitario
+        int randomIdx = (int)(Math.random() * 4);
+        controller.setSospechoso(randomIdx);
+        
         MapaInvestigacion mapa = new MapaInvestigacion(stage, controller);
         mapa.mostrar();
     }
