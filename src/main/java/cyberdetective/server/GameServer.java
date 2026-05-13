@@ -13,7 +13,7 @@ public class GameServer {
     private int currentQuestionIndex = -1;
     private boolean questionAnswered = false;
     private int failedCount = 0;
-    private Set<String> respondedPlayers = new HashSet<>();
+    private Set<ClientHandler> respondedPlayers = new HashSet<>();
     private Map<String, Integer> playerScores = new HashMap<>();
     private ServerSocket serverSocket;
     private boolean running = false;
@@ -37,7 +37,8 @@ public class GameServer {
             }
             
         } catch (IOException e) {
-            if (running) e.printStackTrace();
+            System.err.println("❌ ERROR CRÍTICO al iniciar el servidor: " + e.getMessage());
+            e.printStackTrace();
         }
     }
 
@@ -88,7 +89,7 @@ public class GameServer {
         }
     }
 
-    public synchronized void handleAction(GameMessage msg) {
+    public synchronized void handleAction(GameMessage msg, ClientHandler senderHandler) {
         String data = (String) msg.getData();
         if (data != null && data.startsWith("ANSWER:")) {
             String[] parts = data.split(":");
@@ -103,8 +104,8 @@ public class GameServer {
                 respondedPlayers.clear();
             }
 
-            if (!questionAnswered && !respondedPlayers.contains(msg.getSender())) {
-                respondedPlayers.add(msg.getSender());
+            if (!questionAnswered && !respondedPlayers.contains(senderHandler)) {
+                respondedPlayers.add(senderHandler);
                 if (correct) {
                     questionAnswered = true;
                     String player = msg.getSender();
@@ -139,8 +140,11 @@ public class GameServer {
                 actionRespondedPlayers.clear();
             }
 
-            if (!actionAnswered && !actionRespondedPlayers.contains(msg.getSender())) {
-                actionRespondedPlayers.add(msg.getSender());
+            if (!actionAnswered) {
+                if (actionRespondedPlayers.contains(senderHandler)) {
+                    return;
+                }
+                actionRespondedPlayers.add(senderHandler);
                 if (correct) {
                     actionAnswered = true;
                     String player = msg.getSender();
@@ -169,8 +173,8 @@ public class GameServer {
             broadcast(new GameMessage(GameMessage.Type.ACTION, "OPPONENT_REVEALED", msg.getSender()));
         } else if (data != null && data.startsWith("LEVEL_READY:")) {
             synchronized(this) {
-                readyPlayers.add(msg.getSender());
-                System.out.println("Detective " + msg.getSender() + " listo para el nivel.");
+                readyPlayers.add(senderHandler);
+                System.out.println("Detective " + senderHandler.getPlayerName() + " listo para el nivel.");
                 if (readyPlayers.size() >= 2) {
                     String levelIdx = data.split(":")[1];
                     broadcast(new GameMessage(GameMessage.Type.ACTION, "START_LEVEL:" + levelIdx, "SERVER"));
@@ -185,8 +189,8 @@ public class GameServer {
             }
         } else if ("AVL_READY".equals(data)) {
             synchronized(this) {
-                avlReadyPlayers.add(msg.getSender());
-                System.out.println("Detective " + msg.getSender() + " listo para insertar en AVL. (Total: " + avlReadyPlayers.size() + "/2)");
+                avlReadyPlayers.add(senderHandler);
+                System.out.println("Detective " + senderHandler.getPlayerName() + " listo para insertar en AVL. (Total: " + avlReadyPlayers.size() + "/2)");
                 if (avlReadyPlayers.size() >= 2) {
                     broadcast(new GameMessage(GameMessage.Type.ACTION, "AVL_START:go", "SERVER"));
                     avlReadyPlayers.clear();
@@ -195,8 +199,8 @@ public class GameServer {
             }
         } else if ("INTERROGATION_READY".equals(data)) {
             synchronized(this) {
-                interrogationReadyPlayers.add(msg.getSender());
-                System.out.println("Detective " + msg.getSender() + " listo para el interrogatorio.");
+                interrogationReadyPlayers.add(senderHandler);
+                System.out.println("Detective " + senderHandler.getPlayerName() + " listo para el interrogatorio.");
                 if (interrogationReadyPlayers.size() >= 2) {
                     broadcast(new GameMessage(GameMessage.Type.ACTION, "INTERROGATION_START:go", "SERVER"));
                     interrogationReadyPlayers.clear();
@@ -204,8 +208,8 @@ public class GameServer {
             }
         } else if ("NIVEL5_CHRONO_READY".equals(data)) {
             synchronized(this) {
-                nivel5ChronoReadyPlayers.add(msg.getSender());
-                System.out.println("Detective " + msg.getSender() + " listo para la cronología.");
+                nivel5ChronoReadyPlayers.add(senderHandler);
+                System.out.println("Detective " + senderHandler.getPlayerName() + " listo para cronología N5.");
                 if (nivel5ChronoReadyPlayers.size() >= 2) {
                     broadcast(new GameMessage(GameMessage.Type.ACTION, "NIVEL5_CHRONO_START:go", "SERVER"));
                     nivel5ChronoReadyPlayers.clear();
@@ -213,8 +217,8 @@ public class GameServer {
             }
         } else if ("NIVEL5_REPORT_READY".equals(data)) {
             synchronized(this) {
-                nivel5ReportReadyPlayers.add(msg.getSender());
-                System.out.println("Detective " + msg.getSender() + " listo para el reporte final.");
+                nivel5ReportReadyPlayers.add(senderHandler);
+                System.out.println("Detective " + senderHandler.getPlayerName() + " listo para reporte N5.");
                 if (nivel5ReportReadyPlayers.size() >= 2) {
                     broadcast(new GameMessage(GameMessage.Type.ACTION, "NIVEL5_REPORT_START:go", "SERVER"));
                     nivel5ReportReadyPlayers.clear();
@@ -223,7 +227,7 @@ public class GameServer {
         } else if (data != null && data.startsWith("MINIGAME_READY:")) {
             int qIdx = Integer.parseInt(data.split(":")[1]);
             synchronized(this) {
-                minigameReadyPlayers.add(msg.getSender());
+                minigameReadyPlayers.add(senderHandler);
                 if (minigameReadyPlayers.size() >= 2) {
                     currentMinigameQIdx = qIdx;
                     currentMinigameWinner = null;
@@ -254,14 +258,14 @@ public class GameServer {
     private int currentActionIndex = -1;
     private boolean actionAnswered = false;
     private int actionFailedCount = 0;
-    private Set<String> actionRespondedPlayers = new HashSet<>();
-    private Set<String> readyPlayers = new HashSet<>();
-    private Set<String> avlReadyPlayers = new HashSet<>();
-    private Set<String> interrogationReadyPlayers = new HashSet<>();
-    private Set<String> nivel5ChronoReadyPlayers = new HashSet<>();
-    private Set<String> nivel5ReportReadyPlayers = new HashSet<>();
+    private Set<ClientHandler> actionRespondedPlayers = new HashSet<>();
+    private Set<ClientHandler> readyPlayers = new HashSet<>();
+    private Set<ClientHandler> avlReadyPlayers = new HashSet<>();
+    private Set<ClientHandler> interrogationReadyPlayers = new HashSet<>();
+    private Set<ClientHandler> nivel5ChronoReadyPlayers = new HashSet<>();
+    private Set<ClientHandler> nivel5ReportReadyPlayers = new HashSet<>();
     // Minijuegos
-    private Set<String> minigameReadyPlayers = new HashSet<>();
+    private Set<ClientHandler> minigameReadyPlayers = new HashSet<>();
     private int currentMinigameQIdx = -1;
     private String currentMinigameWinner = null;
 
@@ -285,9 +289,13 @@ class ClientHandler implements Runnable {
     @Override
     public void run() {
         try {
+            System.out.println("Nueva conexión aceptada desde " + socket.getInetAddress());
             out = new ObjectOutputStream(socket.getOutputStream());
-            out.flush(); // Enviar cabecera inmediatamente
+            out.flush(); 
+            System.out.println("Server: ObjectOutputStream flusheado para el cliente.");
+            
             in = new ObjectInputStream(socket.getInputStream());
+            System.out.println("Server: ObjectInputStream listo.");
 
             while (true) {
                 GameMessage msg = (GameMessage) in.readObject();
@@ -295,7 +303,7 @@ class ClientHandler implements Runnable {
                     this.playerName = (String) msg.getData();
                     server.addClient(this);
                 } else {
-                    server.handleAction(msg);
+                    server.handleAction(msg, this);
                 }
             }
         } catch (IOException | ClassNotFoundException e) {
