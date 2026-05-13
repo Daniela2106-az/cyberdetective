@@ -34,7 +34,8 @@ public class MultiplayerJuegoController extends JuegoController {
             // parts: RESOLVED : sender : correct : option : totalPoints
             String[] parts = data.split(":");
             String sender     = parts[1];
-            boolean correct   = Boolean.parseBoolean(parts[2]);
+            // En RESOLVED, la respuesta siempre es correcta (por lógica del servidor)
+            boolean correct   = true; 
             int option        = Integer.parseInt(parts[3]);
             int totalPoints   = Integer.parseInt(parts[4]);
             procesarRespuestaServidor(option, correct, sender, totalPoints);
@@ -142,8 +143,7 @@ public class MultiplayerJuegoController extends JuegoController {
                     for (JuegoListener l : listeners) l.onPuntajeOponenteActualizado(nuevosPuntos);
                 });
             }
-            // Avanzamos la pregunta local para que ambos jugadores estén en sync
-            super.avanzarPreguntaSinPuntaje();
+            // La sincronización visual se hace en onMinijuegoResuelto de AccionesNivel
             Platform.runLater(() -> {
                 for (JuegoListener l : listeners) l.onMinijuegoResuelto(ganador, qIdx, soyYo);
             });
@@ -173,9 +173,16 @@ public class MultiplayerJuegoController extends JuegoController {
 
     @Override
     public boolean responderPregunta(int opcionElegida) {
-        // En multijugador, cada jugador responde de forma independiente.
-        // Se aplica puntuación local sin sincronizar con el servidor.
-        return super.responderPregunta(opcionElegida);
+        // En multijugador, no actualizamos el puntaje localmente de inmediato.
+        // Enviamos el intento al servidor y esperamos el mensaje RESOLVED o PLAYER_FAILED.
+        String[] dataPregunta = getPreguntasNivelActual()[getPreguntaActual()];
+        int correctaIdx = Integer.parseInt(dataPregunta[dataPregunta.length - 1]);
+        boolean esCorrecta = (opcionElegida == correctaIdx);
+
+        client.send(new GameMessage(GameMessage.Type.ACTION,
+            "ANSWER:" + getPreguntaActual() + ":" + opcionElegida + ":" + esCorrecta, getNombreJugador()));
+        
+        return esCorrecta; 
     }
 
     // Cuando el oponente revela una evidencia: avanzar estado SIN puntaje local
@@ -190,21 +197,24 @@ public class MultiplayerJuegoController extends JuegoController {
         Platform.runLater(() -> {
             boolean soyYo = respondioPrimero.equals(getNombreJugador());
 
+            // Notificamos a la UI para que pinte el resultado (colores, pausa, etc.)
+            for (JuegoListener l : listeners) {
+                l.onRespuestaRecibida(opcionElegida, esCorrecta, respondioPrimero);
+            }
+
             if (soyYo) {
                 // El servidor confirma mi puntaje total
                 super.setPuntaje(puntosActualizados);
-                super.avanzarPreguntaSinPuntaje();
             } else {
                 // El oponente respondió primero
                 this.oponentePuntaje = puntosActualizados;
                 for (JuegoListener l : listeners) {
                     l.onPuntajeOponenteActualizado(puntosActualizados);
                 }
-                super.avanzarPreguntaSinPuntaje();
-                for (JuegoListener l : listeners) {
-                    l.onRespuestaOponente(respondioPrimero, opcionElegida, esCorrecta);
-                }
             }
+            
+            // Avanzamos el índice de pregunta para que mostrarSiguientePregunta() vea la nueva
+            super.avanzarPreguntaSinPuntaje();
         });
     }
 
@@ -212,8 +222,20 @@ public class MultiplayerJuegoController extends JuegoController {
         Platform.runLater(() -> {
             if (data.startsWith("START_LEVEL:")) {
                 for (JuegoListener l : listeners) l.onNivelIniciado();
+            } else if (data.startsWith("INTERROGATION_START:")) {
+                for (JuegoListener l : listeners) l.onInterrogatorioListo();
+            } else if (data.startsWith("NIVEL5_CHRONO_START:")) {
+                for (JuegoListener l : listeners) l.onNivel5CronologiaListo();
+            } else if (data.startsWith("NIVEL5_REPORT_START:")) {
+                for (JuegoListener l : listeners) l.onNivel5ReporteFinalListo();
             } else if (data.startsWith("AVL_START:")) {
                 for (JuegoListener l : listeners) l.onArbolListoParaInsertar();
+            } else if (data.startsWith("OPPONENT_SCORE_P2:")) {
+                String[] parts = data.split(":");
+                this.oponentePuntaje = Integer.parseInt(parts[1]);
+                for (JuegoListener l : listeners) {
+                    l.onPuntajeOponenteActualizado(this.oponentePuntaje);
+                }
             } else if (data.startsWith("OPPONENT_ACTION:")) {
                 String content = data.substring("OPPONENT_ACTION:".length());
                 int idx = Integer.parseInt(content.split(":")[0]);
@@ -224,6 +246,10 @@ public class MultiplayerJuegoController extends JuegoController {
 
     public void enviarListoParaArbol() {
         client.send(new GameMessage(GameMessage.Type.ACTION, "AVL_READY", getNombreJugador()));
+    }
+
+    public void enviarListoParaInterrogatorio() {
+        client.send(new GameMessage(GameMessage.Type.ACTION, "INTERROGATION_READY", getNombreJugador()));
     }
 
     public void notificarAccionInvestigacion(int accionIdx, String extraData) {
@@ -251,5 +277,13 @@ public class MultiplayerJuegoController extends JuegoController {
     public void enviarMinijuegoCompletado(int qIdx, long tiempoMs) {
         client.send(new GameMessage(GameMessage.Type.ACTION,
             "MINIGAME_DONE:" + qIdx + ":" + tiempoMs, getNombreJugador()));
+    }
+
+    public void enviarListoCronologiaNivel5() {
+        client.send(new GameMessage(GameMessage.Type.ACTION, "NIVEL5_CHRONO_READY", getNombreJugador()));
+    }
+
+    public void enviarListoReporteFinalNivel5() {
+        client.send(new GameMessage(GameMessage.Type.ACTION, "NIVEL5_REPORT_READY", getNombreJugador()));
     }
 }

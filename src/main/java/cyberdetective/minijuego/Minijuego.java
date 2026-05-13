@@ -11,22 +11,37 @@ public abstract class Minijuego extends Pane {
 
     protected LongConsumer onJuegoTerminado;
     protected long tiempoInicio = -1;
+    protected javafx.scene.Node evidenciaVirtual;
+    protected String datosExtra;
+    protected Runnable onVerEvidenciaRequest;
+
+    public void setOnVerEvidenciaRequest(Runnable callback) {
+        this.onVerEvidenciaRequest = callback;
+    }
 
     public void setOnJuegoTerminado(LongConsumer callback) {
         this.onJuegoTerminado = callback;
     }
 
+    public void setEvidenciaNode(javafx.scene.Node nodo) {
+        this.evidenciaVirtual = nodo;
+    }
+
+    public void setDatosExtra(String data) {
+        this.datosExtra = data;
+    }
+
     /** Llama a este método para arrancar el temporizador y mostrar el minijuego. */
     public abstract void iniciar();
 
-    /** Limpieza al cerrar el popup antes de tiempo (si aplica). */
+    /** Llama a este método cuando el minijuego se completa internamente. */
     public abstract void finalizar();
 
-    /** Llama internamente cuando el jugador completa el reto. */
     protected void completar() {
-        long elapsed = (tiempoInicio >= 0) ? System.currentTimeMillis() - tiempoInicio : 0;
+        if (tiempoInicio == -1) return;
+        long t = System.currentTimeMillis() - tiempoInicio;
         if (onJuegoTerminado != null) {
-            onJuegoTerminado.accept(elapsed);
+            onJuegoTerminado.accept(t);
         }
     }
 }

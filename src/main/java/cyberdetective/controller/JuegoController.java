@@ -104,6 +104,9 @@ public class JuegoController {
         default void onPuntajeOponenteActualizado(int puntaje) {}
         default void onOponenteDesconectado(String nombre) {}
         default void onArbolListoParaInsertar() {}
+        default void onInterrogatorioListo() {}
+        default void onNivel5CronologiaListo() {}
+        default void onNivel5ReporteFinalListo() {}
         /** El servidor confirmó el ID del minijuego a usar en la pregunta qIdx. */
         default void onMinijuegoIniciado(int gameId, int qIdx) {}
         /** El servidor confirmó al ganador del minijuego de la pregunta qIdx. */

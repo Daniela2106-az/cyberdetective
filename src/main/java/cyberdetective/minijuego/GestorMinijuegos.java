@@ -32,11 +32,14 @@ public class GestorMinijuegos {
      */
     public static Minijuego crearMinijuego(int id) {
         switch (id) {
-            case 1: return new EscombroMinijuego();
-            // case 2: return new OtroMinijuego1();
-            // case 3: return new OtroMinijuego2();
-            // case 4: return new MinijuegoIdentidad1();  ... etc.
-            default: return new EscombroMinijuego();
+            case 1: case 2: case 3: 
+                return new EscombroMinijuego();
+            case 4: case 5: case 6:
+                return new SopaLetrasMinijuego();
+            case 7: case 8: case 9:
+                return new ConexionMinijuego();
+            default: 
+                return new EscombroMinijuego();
         }
     }
 }

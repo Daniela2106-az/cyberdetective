@@ -566,7 +566,15 @@ public class AccionesNivel implements JuegoController.JuegoListener {
         btnSiguiente = new Button("Continuar al interrogatorio →");
         btnSiguiente.getStyleClass().add("btn-primario");
         btnSiguiente.setDisable(true);
-        btnSiguiente.setOnAction(e -> mostrarFasePreguntas());
+        btnSiguiente.setOnAction(e -> {
+            if (controller instanceof cyberdetective.controller.MultiplayerJuegoController mc) {
+                btnSiguiente.setText("⏳ Esperando al oponente...");
+                btnSiguiente.setDisable(true);
+                mc.enviarListoParaInterrogatorio();
+            } else {
+                mostrarFasePreguntas();
+            }
+        });
         HBox btnBox = new HBox(btnSiguiente);
         btnBox.setAlignment(Pos.CENTER_RIGHT);
 
@@ -626,90 +634,91 @@ public class AccionesNivel implements JuegoController.JuegoListener {
         String dispositivo = obtenerDispositivoSospechoso();
 
         VBox accion1 = crearTarjetaAccion("1. Recolectar captura de pantalla",
-                "Haz clic en la captura para recolectarla como evidencia.", 0);
+                "Debes resolver el desafío para recolectar esta evidencia.", 0);
         tarjetasAcciones[0] = accion1;
         HBox ev1 = construirEvidenciaConDatos("/images/evidencia_chat.png", "DATOS DEL CHAT CAPTURADO",
                 new String[][]{{"Usuario",usuario},{"Plataforma","Red social NetCity"},
                         {"Fecha","Hace 3 días, 10:47pm"},{"Dispositivo",dispositivo},
                         {"Mensajes","14 mensajes ofensivos"},{"Estado","Cuenta activa"}},
                 "Contenido censurado — solo datos técnicos visibles");
-        ev1.setStyle("-fx-cursor:hand;");
-        ev1.setOnMouseClicked(e -> completarAccion(0, accion1,
-                "Captura recolectada. Usuario: " + usuario,
-                "Bien. La captura confirma al usuario. Guarda el nombre y el dispositivo.", true));
-        accion1.getChildren().add(ev1); nodos.add(accion1);
+        
+        Button btnDesafio = new Button("⚔  INICIAR DESAFÍO");
+        btnDesafio.getStyleClass().add("btn-primario");
+        btnDesafio.setMaxWidth(Double.MAX_VALUE);
+        btnDesafio.setOnAction(e -> {
+            btnDesafio.setDisable(true);
+            btnDesafio.setText("⏳ Esperando al oponente...");
+            if (controller instanceof cyberdetective.controller.MultiplayerJuegoController mc) {
+                mc.enviarListoParaMinijuego(0);
+            } else {
+                int gameId = cyberdetective.minijuego.GestorMinijuegos.seleccionarIdAleatorio(0);
+                mostrarMinijuegoPopupParaAccion(gameId, 0, ev1, accion1, btnDesafio, "Captura recolectada. Usuario: " + usuario, "Bien. La captura confirma al usuario.", false);
+            }
+        });
+        
+        // Guardar referencias para el modo multijugador
+        mapaEvidencias.put(0, ev1);
+        mapaAccionesVBox.put(0, accion1);
+        mapaBtnDesafio.put(0, btnDesafio);
+        mapaTextosCompletar.put(0, new String[]{"Captura recolectada. Usuario: " + usuario, "Bien. La captura confirma al usuario."});
+
+        accion1.getChildren().add(btnDesafio); nodos.add(accion1);
 
         VBox accion2 = crearTarjetaAccion("2. Identificar el usuario agresor",
                 "Según la tarjeta de datos, ¿cuál es el usuario agresor?", 1);
         tarjetasAcciones[1] = accion2;
-        String[] usuarios = {"@val_amiga2025", usuario, "@random_user99", "@netcity_student"};
-        mezclar(usuarios);
-        HBox opcionesU = new HBox(10); opcionesU.setAlignment(Pos.CENTER_LEFT);
-        for (String u : usuarios) {
-            final boolean ok = u.equals(usuario);
-            Button btn = new Button(u); btn.setStyle(estiloBotonMonospace());
-            btn.setOnAction(e -> {
-                procesarAccionBoton(1, ok, opcionesU, btn, 
-                    () -> {
-                        completarAccion(1, accion2, "Usuario confirmado: " + usuario,
-                                "Correcto. Ese usuario coincide con los datos de la captura.", true);
-                        opcionesU.getChildren().forEach(n -> { if (n instanceof Button b) b.setDisable(true); });
-                        btn.setStyle(estiloBotonMonospace() + "-fx-border-color:#00ff8860;-fx-text-fill:#00ff88;");
-                    },
-                    tipoRes -> {
-                        completarAccionConTipo(1, accion2, "Usuario confirmado: " + usuario,
-                                tipoRes == 1 ? "Confirmado por el otro detective." : "Este era el usuario correcto.", tipoRes, false);
-                        // Buscar el correcto para pintarlo de verde a ambos
-                        for(javafx.scene.Node n : opcionesU.getChildren()) {
-                            if (n instanceof Button b && b.getText().equals(usuario)) {
-                                b.setStyle(estiloBotonMonospace() + "-fx-border-color:#00ff8860;-fx-text-fill:#00ff88;");
-                            }
-                        }
-                    },
-                    "Ese no es. Revisa el campo 'Usuario'."
-                );
-            });
-            opcionesU.getChildren().add(btn);
-        }
-        accion2.getChildren().add(opcionesU); nodos.add(accion2);
+
+        Button btnDesafio2 = new Button("⚔  INICIAR DESAFÍO");
+        btnDesafio2.getStyleClass().add("btn-primario");
+        btnDesafio2.setMaxWidth(Double.MAX_VALUE);
+        btnDesafio2.setOnAction(e -> {
+            btnDesafio2.setDisable(true);
+            btnDesafio2.setText("⏳ Esperando al oponente...");
+            if (controller instanceof cyberdetective.controller.MultiplayerJuegoController mc) {
+                mc.enviarListoParaMinijuego(1);
+            } else {
+                int gameId = cyberdetective.minijuego.GestorMinijuegos.seleccionarIdAleatorio(1);
+                mostrarMinijuegoPopupParaAccion(gameId, 1, null, accion2, btnDesafio2, "Usuario confirmado: " + usuario, "Correcto. Ese usuario coincide con los datos de la captura.", false);
+            }
+        });
+
+        // Guardar referencias para el modo multijugador
+        mapaDatosExtra.put(1, usuario);
+        mapaAccionesVBox.put(1, accion2);
+        mapaBtnDesafio.put(1, btnDesafio2);
+        mapaTextosCompletar.put(1, new String[]{"Usuario confirmado: " + usuario, "Correcto. Ese usuario coincide con los datos de la captura."});
+
+        accion2.getChildren().add(btnDesafio2); nodos.add(accion2);
 
         VBox accion3 = crearTarjetaAccion("3. Clasificar el tipo de agresión",
                 "Según los mensajes y la ley colombiana, ¿qué tipo de agresión es esta?", 2);
         tarjetasAcciones[2] = accion3;
-        String[][] tipos = {
-                {"Injuria (Art. 220 C.P.) — Mensajes que ofenden el honor y afectan el buen nombre","correcto"},
-                {"Amenaza (Art. 347 C.P.) — Mensajes que generan miedo o anuncian un mal futuro","incorrecto"},
-                {"Extorsión (Art. 244 C.P.) — Exigencia de algo a cambio de no causar daño","incorrecto"},
-                {"Acoso laboral (Ley 1010) — Conducta persistente en entorno de trabajo","incorrecto"}
-        };
-        VBox opcionesT = new VBox(8);
-        for (String[] tipo : tipos) {
-            final boolean ok = tipo[1].equals("correcto");
-            Button btn = new Button(tipo[0]);
-            btn.getStyleClass().add("btn-opcion"); btn.setMaxWidth(Double.MAX_VALUE); btn.setWrapText(true);
-            btn.setOnAction(e -> {
-                procesarAccionBoton(2, ok, opcionesT, btn,
-                    () -> {
-                        completarAccion(2, accion3, "Agresión: Injuria — Art. 220 C.P.",
-                                "Correcto. Los mensajes ofensivos reiterados son Injuria.", true);
-                        opcionesT.getChildren().forEach(n -> { if (n instanceof Button b) b.setDisable(true); });
-                        btn.getStyleClass().add("btn-opcion-correcto");
-                    },
-                    tipoRes -> {
-                        completarAccionConTipo(2, accion3, "Agresión: Injuria — Art. 220 C.P.",
-                                tipoRes == 1 ? "Confirmado por el otro detective." : "Esta era la respuesta correcta.", tipoRes, false);
-                        for(javafx.scene.Node n : opcionesT.getChildren()) {
-                            if (n instanceof Button b && b.getText().startsWith("Injuria")) {
-                                b.getStyleClass().add("btn-opcion-correcto");
-                            }
-                        }
-                    },
-                    "No coincide. Los mensajes dañan el honor — eso es Injuria."
-                );
-            });
-            opcionesT.getChildren().add(btn);
-        }
-        accion3.getChildren().add(opcionesT); nodos.add(accion3);
+
+        Button btnDesafio3 = new Button("⚔  INICIAR DESAFÍO");
+        btnDesafio3.getStyleClass().add("btn-primario");
+        btnDesafio3.setMaxWidth(Double.MAX_VALUE);
+        btnDesafio3.setOnAction(e -> {
+            btnDesafio3.setDisable(true);
+            btnDesafio3.setText("⏳ Esperando al oponente...");
+            if (controller instanceof cyberdetective.controller.MultiplayerJuegoController mc) {
+                mc.enviarListoParaMinijuego(2);
+            } else {
+                int gameId = cyberdetective.minijuego.GestorMinijuegos.seleccionarIdAleatorio(2);
+                mostrarMinijuegoPopupParaAccion(gameId, 2, null, accion3, btnDesafio3, "Agresión: Injuria — Art. 220 C.P.", "Correcto. Los mensajes ofensivos reiterados son Injuria.", false);
+            }
+        });
+
+        String datosExtra = "Injuria (Art. 220 C.P.):Mensajes que ofenden el honor y afectan el buen nombre|" +
+                            "Amenaza (Art. 347 C.P.):Mensajes que generan miedo o anuncian un mal futuro|" +
+                            "Extorsión (Art. 244 C.P.):Exigencia de algo a cambio de no causar daño|" +
+                            "Acoso laboral (Ley 1010):Conducta persistente en entorno de trabajo";
+
+        mapaDatosExtra.put(2, datosExtra);
+        mapaAccionesVBox.put(2, accion3);
+        mapaBtnDesafio.put(2, btnDesafio3);
+        mapaTextosCompletar.put(2, new String[]{"Agresión: Injuria — Art. 220 C.P.", "Correcto. Los mensajes ofensivos reiterados son Injuria."});
+
+        accion3.getChildren().add(btnDesafio3); nodos.add(accion3);
         return nodos;
     }
 
@@ -720,7 +729,7 @@ public class AccionesNivel implements JuegoController.JuegoListener {
         String usuario = obtenerUsuarioSospechoso();
 
         VBox accion1 = crearTarjetaAccion("1. Identificar la publicación original",
-                "Examina el post y sus metadatos. Haz clic en la imagen para registrarla.", 0);
+                "Debes resolver el desafío para identificar la publicación.", 0);
         tarjetasAcciones[0] = accion1;
         HBox evPost = construirEvidenciaConDatos("/images/evidencia_post_falso.png",
                 "METADATOS DE LA PUBLICACIÓN",
@@ -728,59 +737,84 @@ public class AccionesNivel implements JuegoController.JuegoListener {
                         {"Plataforma","Foro NetCity"},{"Contenido","Información falsa [CENSURADO]"},
                         {"Alcance","847 vistas, 134 compartidos"},{"Estado","Reportado 3 veces"}},
                 "Contenido censurado por contener información falsa");
-        evPost.setStyle("-fx-cursor:hand;");
-        evPost.setOnMouseClicked(e -> completarAccion(0, accion1,
-                "Publicación identificada. Autor: " + usuario,
-                "Esa es la publicación que inició todo. Fíjate en quién la publicó.", true));
-        accion1.getChildren().add(evPost); nodos.add(accion1);
+
+        Button btnDesafio = new Button("⚔  INICIAR DESAFÍO");
+        btnDesafio.getStyleClass().add("btn-primario");
+        btnDesafio.setMaxWidth(Double.MAX_VALUE);
+        btnDesafio.setOnAction(e -> {
+            btnDesafio.setDisable(true);
+            btnDesafio.setText("⏳ Esperando al oponente...");
+            if (controller instanceof cyberdetective.controller.MultiplayerJuegoController mc) {
+                mc.enviarListoParaMinijuego(0);
+            } else {
+                int gameId = cyberdetective.minijuego.GestorMinijuegos.seleccionarIdAleatorio(0);
+                mostrarMinijuegoPopupParaAccion(gameId, 0, evPost, accion1, btnDesafio, "Publicación identificada. Autor: " + usuario, "Esa es la publicación que inició todo. Fíjate en quién la publicó.", false);
+            }
+        });
+
+        // Guardar referencias para el modo multijugador
+        mapaEvidencias.put(0, evPost);
+        mapaAccionesVBox.put(0, accion1);
+        mapaBtnDesafio.put(0, btnDesafio);
+        mapaTextosCompletar.put(0, new String[]{"Publicación identificada. Autor: " + usuario, "Esa es la publicación que inició todo. Fíjate en quién la publicó."});
+
+        accion1.getChildren().add(btnDesafio); nodos.add(accion1);
 
         VBox accion2 = crearTarjetaAccion("2. Rastrear quién inició el rumor",
-                "Según los metadatos, ¿cuál es la cuenta que publicó el rumor primero?", 1);
+                "Debes resolver el desafío para confirmar el autor del rumor.", 1);
         tarjetasAcciones[1] = accion2;
-        String[] autores = {"@compañero_random","@estudiante2025", usuario,"@netcity_oficial"};
-        mezclar(autores);
-        VBox opcionesA = new VBox(8);
-        for (String autor : autores) {
-            final boolean ok = autor.equals(usuario);
-            Button btn = new Button(autor);
-            btn.getStyleClass().add("btn-opcion"); btn.setMaxWidth(Double.MAX_VALUE);
-            btn.setOnAction(e -> {
-                if (ok) {
-                    completarAccion(1, accion2, "Origen rastreado: " + usuario,
-                            "Confirmado. Los metadatos apuntan a esa cuenta.", true);
-                    opcionesA.getChildren().forEach(n -> { if (n instanceof Button b) b.setDisable(true); });
-                    btn.getStyleClass().add("btn-opcion-correcto");
-                } else {
-                    btn.getStyleClass().add("btn-opcion-incorrecto");
-                    labelMensajeAlex.setText("No coincide. Revisa 'Publicado por' en los metadatos.");
-                    PauseTransition p = new PauseTransition(Duration.millis(800));
-                    p.setOnFinished(ig -> btn.getStyleClass().remove("btn-opcion-incorrecto")); p.play();
-                }
-            });
-            opcionesA.getChildren().add(btn);
-        }
-        accion2.getChildren().add(opcionesA); nodos.add(accion2);
 
-        VBox accion3 = crearTarjetaAccion("3. Determinar si es información falsa",
-                "Basado en las evidencias, ¿cuál es tu determinación legal?", 2);
+        Button btnDesafio2 = new Button("⚔  INICIAR DESAFÍO");
+        btnDesafio2.getStyleClass().add("btn-primario");
+        btnDesafio2.setMaxWidth(Double.MAX_VALUE);
+        btnDesafio2.setOnAction(e -> {
+            btnDesafio2.setDisable(true);
+            btnDesafio2.setText("⏳ Esperando al oponente...");
+            if (controller instanceof cyberdetective.controller.MultiplayerJuegoController mc) {
+                mc.enviarListoParaMinijuego(1);
+            } else {
+                int gameId = cyberdetective.minijuego.GestorMinijuegos.seleccionarIdAleatorio(1);
+                mostrarMinijuegoPopupParaAccion(gameId, 1, null, accion2, btnDesafio2, "Origen rastreado: " + usuario, "Confirmado. Los metadatos apuntan a esa cuenta.", false);
+            }
+        });
+
+        // Guardar referencias para el modo multijugador
+        mapaDatosExtra.put(1, usuario);
+        mapaAccionesVBox.put(1, accion2);
+        mapaBtnDesafio.put(1, btnDesafio2);
+        mapaTextosCompletar.put(1, new String[]{"Origen rastreado: " + usuario, "Confirmado. Los metadatos apuntan a esa cuenta."});
+
+        accion2.getChildren().add(btnDesafio2); nodos.add(accion2);
+
+        VBox accion3 = crearTarjetaAccion("3. Clasificar el tipo de agresión",
+                "Según los mensajes y la ley colombiana, ¿qué tipo de agresión es esta?", 2);
         tarjetasAcciones[2] = accion3;
-        Button btnFalso = new Button("✗  Es información FALSA — constituye Calumnia (Art. 221 C.P.)");
-        btnFalso.getStyleClass().add("btn-opcion"); btnFalso.setMaxWidth(Double.MAX_VALUE);
-        Button btnVerdadero = new Button("✓  Es información verdadera — no constituye delito");
-        btnVerdadero.getStyleClass().add("btn-opcion"); btnVerdadero.setMaxWidth(Double.MAX_VALUE);
-        btnFalso.setOnAction(e -> {
-            completarAccion(2, accion3, "Calumnia Art. 221 C.P.",
-                    "Correcto. Publicar información inventada que daña la reputación es Calumnia.", true);
-            btnFalso.getStyleClass().add("btn-opcion-correcto");
-            btnVerdadero.setDisable(true); btnFalso.setDisable(true);
+
+        Button btnDesafio3 = new Button("⚔  INICIAR DESAFÍO");
+        btnDesafio3.getStyleClass().add("btn-primario");
+        btnDesafio3.setMaxWidth(Double.MAX_VALUE);
+        btnDesafio3.setOnAction(e -> {
+            btnDesafio3.setDisable(true);
+            btnDesafio3.setText("⏳ Esperando al oponente...");
+            if (controller instanceof cyberdetective.controller.MultiplayerJuegoController mc) {
+                mc.enviarListoParaMinijuego(2);
+            } else {
+                int gameId = cyberdetective.minijuego.GestorMinijuegos.seleccionarIdAleatorio(2);
+                mostrarMinijuegoPopupParaAccion(gameId, 2, null, accion3, btnDesafio3, "Agresión: Calumnia — Art. 221 C.P.", "Correcto. Imputar un delito falso a alguien es Calumnia.", false);
+            }
         });
-        btnVerdadero.setOnAction(e -> {
-            btnVerdadero.getStyleClass().add("btn-opcion-incorrecto");
-            labelMensajeAlex.setText("No. Los metadatos dicen 'FALSO'. Eso es Calumnia.");
-            PauseTransition p = new PauseTransition(Duration.millis(900));
-            p.setOnFinished(ig -> btnVerdadero.getStyleClass().remove("btn-opcion-incorrecto")); p.play();
-        });
-        accion3.getChildren().add(new VBox(8, btnFalso, btnVerdadero)); nodos.add(accion3);
+
+        String datosExtra3 = "Calumnia (Art. 221 C.P.):Imputar falsamente a otro la comisión de un delito|" +
+                            "Injuria (Art. 220 C.P.):Mensajes que ofenden el honor y afectan el buen nombre|" +
+                            "Amenaza (Art. 347 C.P.):Mensajes que generan miedo o anuncian un mal futuro|" +
+                            "Acoso (Ley 1010):Conducta persistente de hostigamiento";
+
+        mapaDatosExtra.put(2, datosExtra3);
+        mapaAccionesVBox.put(2, accion3);
+        mapaBtnDesafio.put(2, btnDesafio3);
+        mapaTextosCompletar.put(2, new String[]{"Agresión: Calumnia — Art. 221 C.P.", "Correcto. Imputar un delito falso a alguien es Calumnia."});
+
+        accion3.getChildren().add(btnDesafio3); nodos.add(accion3);
         return nodos;
     }
 
@@ -791,78 +825,98 @@ public class AccionesNivel implements JuegoController.JuegoListener {
         String ip = obtenerIPSospechoso();
         String dispositivo = obtenerDispositivoSospechoso();
 
+        // 1. Analizar la información del perfil falso (Escombros)
         VBox accion1 = crearTarjetaAccion("1. Analizar la información del perfil falso",
-                "Examina el perfil sospechoso. Los datos forenses están en la tarjeta.", 0);
+                "Debes resolver el desafío para analizar los datos del perfil.", 0);
         tarjetasAcciones[0] = accion1;
-        // Imagen nivel 3: evidencia_perfil_falso.png
         HBox evPerfil = construirEvidenciaConDatos("/images/evidencia_perfil_falso.png",
                 "DATOS FORENSES DEL PERFIL FALSO",
                 new String[][]{{"IP creación",ip},{"Dispositivo",dispositivo},
                         {"Fecha","Hace 5 días, 11:22pm"},{"Foto","Robada del perfil de Valeria"},
                         {"Publicaciones","8 mensajes ofensivos en 5 días"},{"Estado","Suspendida por reporte"}},
                 "Perfil suspendido — datos preservados para investigación");
-        evPerfil.setStyle("-fx-cursor:hand;");
-        evPerfil.setOnMouseClicked(e -> completarAccion(0, accion1,
-                "Perfil analizado. IP: " + ip,
-                "Todos los indicadores apuntan a suplantación. La IP es la clave.", true));
-        accion1.getChildren().add(evPerfil); nodos.add(accion1);
+        
+        Button btnDesafio1 = new Button("⚔  INICIAR DESAFÍO");
+        btnDesafio1.getStyleClass().add("btn-primario");
+        btnDesafio1.setMaxWidth(Double.MAX_VALUE);
+        btnDesafio1.setOnAction(e -> {
+            btnDesafio1.setDisable(true);
+            btnDesafio1.setText("⏳ Esperando al oponente...");
+            if (controller instanceof cyberdetective.controller.MultiplayerJuegoController mc) {
+                mc.enviarListoParaMinijuego(0);
+            } else {
+                int gameId = cyberdetective.minijuego.GestorMinijuegos.seleccionarIdAleatorio(0);
+                mostrarMinijuegoPopupParaAccion(gameId, 0, evPerfil, accion1, btnDesafio1, "Perfil analizado. IP: " + ip, "Todos los indicadores apuntan a suplantación. La IP es la clave.", false);
+            }
+        });
+        
+        mapaEvidencias.put(0, evPerfil);
+        mapaAccionesVBox.put(0, accion1);
+        mapaBtnDesafio.put(0, btnDesafio1);
+        mapaTextosCompletar.put(0, new String[]{"Perfil analizado. IP: " + ip, "Todos los indicadores apuntan a suplantación. La IP es la clave."});
+        accion1.getChildren().add(btnDesafio1); nodos.add(accion1);
 
+        // 2. Rastrear la dirección IP de creación (Sopa de letras)
         VBox accion2 = crearTarjetaAccion("2. Rastrear la dirección IP de creación",
-                "El servidor registró estas IPs. ¿Cuál coincide con los datos forenses?", 1);
+                "Debes resolver el desafío para confirmar la IP de origen.", 1);
         tarjetasAcciones[1] = accion2;
-        String[] ips = {"192.168.100.22", ip, "10.10.10.1", "172.20.0.55"};
-        mezclar(ips);
-        HBox opcionesIP = new HBox(10); opcionesIP.setAlignment(Pos.CENTER_LEFT);
-        for (String ipOpc : ips) {
-            final boolean ok = ipOpc.equals(ip);
-            Button btn = new Button(ipOpc); btn.setStyle(estiloBotonIP());
-            btn.setOnAction(e -> {
-                if (ok) {
-                    completarAccion(1, accion2, "IP rastreada: " + ip,
-                            "Esa IP ya la vimos antes. Confirma quién creó la cuenta.", true);
-                    opcionesIP.getChildren().forEach(n -> { if (n instanceof Button b) b.setDisable(true); });
-                    btn.setStyle(estiloBotonIP() + "-fx-border-color:#00ff8860;-fx-text-fill:#00ff88;");
-                } else {
-                    btn.setStyle(estiloBotonIP() + "-fx-border-color:#ff004460;-fx-text-fill:#ff4466;");
-                    labelMensajeAlex.setText("Esa IP no corresponde. Compara con 'IP creación'.");
-                    PauseTransition p = new PauseTransition(Duration.millis(800));
-                    p.setOnFinished(ig -> btn.setStyle(estiloBotonIP())); p.play();
-                }
-            });
-            opcionesIP.getChildren().add(btn);
-        }
-        accion2.getChildren().add(opcionesIP); nodos.add(accion2);
 
+        Button btnDesafio2 = new Button("⚔  INICIAR DESAFÍO");
+        btnDesafio2.getStyleClass().add("btn-primario");
+        btnDesafio2.setMaxWidth(Double.MAX_VALUE);
+        btnDesafio2.setOnAction(e -> {
+            btnDesafio2.setDisable(true);
+            btnDesafio2.setText("⏳ Esperando al oponente...");
+            if (controller instanceof cyberdetective.controller.MultiplayerJuegoController mc) {
+                mc.enviarListoParaMinijuego(1);
+            } else {
+                int gameId = cyberdetective.minijuego.GestorMinijuegos.seleccionarIdAleatorio(1);
+                mostrarMinijuegoPopupParaAccion(gameId, 1, null, accion2, btnDesafio2, "IP rastreada: " + ip, "Esa IP ya la vimos antes. Confirma quién creó la cuenta.", false);
+            }
+        });
+
+        mapaDatosExtra.put(1, ip);
+        mapaAccionesVBox.put(1, accion2);
+        mapaBtnDesafio.put(1, btnDesafio2);
+        mapaTextosCompletar.put(1, new String[]{"IP rastreada: " + ip, "Esa IP ya la vimos antes. Confirma quién creó la cuenta."});
+        accion2.getChildren().add(btnDesafio2); nodos.add(accion2);
+
+        // 3. Identificar quién está detrás de la suplantación (Conexiones)
         VBox accion3 = crearTarjetaAccion("3. Identificar quién está detrás de la suplantación",
-                "Con la IP y el dispositivo identificados, ¿a quién le pertenece la cuenta falsa?", 2);
+                "Conecta la IP con el sospechoso correspondiente.", 2);
+        tarjetasAcciones[2] = accion3;
 
-        Label hintL3 = new Label("Recuerda revisar en los incidentes del árbol AVL y en las evidencias recolectadas que de pronto ahí se encuentra el nombre del usuario asociado a la IP y dispositivo.");
-        hintL3.setStyle("-fx-font-size:13px; -fx-text-fill:#e0e0f0; -fx-font-weight:bold; -fx-wrap-text:true;");
-        hintL3.setWrapText(true);
-        accion3.getChildren().add(hintL3);
+        Button btnDesafio3 = new Button("⚔  INICIAR DESAFÍO");
+        btnDesafio3.getStyleClass().add("btn-primario");
+        btnDesafio3.setMaxWidth(Double.MAX_VALUE);
+        btnDesafio3.setOnAction(e -> {
+            btnDesafio3.setDisable(true);
+            btnDesafio3.setText("⏳ Esperando al oponente...");
+            if (controller instanceof cyberdetective.controller.MultiplayerJuegoController mc) {
+                mc.enviarListoParaMinijuego(2);
+            } else {
+                int gameId = cyberdetective.minijuego.GestorMinijuegos.seleccionarIdAleatorio(2);
+                mostrarMinijuegoPopupParaAccion(gameId, 2, null, accion3, btnDesafio3, "Sospechoso: " + controller.getSospechoso(), "Confirmado. IP y dispositivo apuntan a esta persona.", false);
+            }
+        });
 
-        VBox opcionesS = new VBox(8);
         String sospReal = controller.getSospechoso();
-        for (String s : getSospechososOrdenados()) {
-            final boolean ok = s.equals(sospReal);
-            Button btn = new Button(s);
-            btn.getStyleClass().add("btn-opcion"); btn.setMaxWidth(Double.MAX_VALUE);
-            btn.setOnAction(e -> {
-                if (ok) {
-                    completarAccion(2, accion3, "Sospechoso: " + sospReal,
-                            "Confirmado. IP y dispositivo apuntan a esta persona.", true);
-                    opcionesS.getChildren().forEach(n -> { if (n instanceof Button b) b.setDisable(true); });
-                    btn.getStyleClass().add("btn-opcion-correcto");
-                } else {
-                    btn.getStyleClass().add("btn-opcion-incorrecto");
-                    labelMensajeAlex.setText("No coincide con la IP rastreada.");
-                    PauseTransition p = new PauseTransition(Duration.millis(800));
-                    p.setOnFinished(ig -> btn.getStyleClass().remove("btn-opcion-incorrecto")); p.play();
-                }
-            });
-            opcionesS.getChildren().add(btn);
-        }
-        accion3.getChildren().add(opcionesS); nodos.add(accion3);
+        String[] sospechosos = getSospechososOrdenados();
+        int realIdx = obtenerIndiceSospechoso();
+        String[] ips = {"192.168.100.22", ip, "10.10.10.1", "172.20.0.55"};
+
+        String dataConexion = String.format("%s:%s|*%s:%s|%s:%s|%s:%s",
+                ips[0], sospechosos[(realIdx+1)%4],
+                ip, sospReal,
+                ips[2], sospechosos[(realIdx+2)%4],
+                ips[3], sospechosos[(realIdx+3)%4]);
+
+        mapaDatosExtra.put(2, dataConexion);
+        mapaAccionesVBox.put(2, accion3);
+        mapaBtnDesafio.put(2, btnDesafio3);
+        mapaTextosCompletar.put(2, new String[]{"Sospechoso: " + sospReal, "Confirmado. IP y dispositivo apuntan a esta persona."});
+
+        accion3.getChildren().add(btnDesafio3); nodos.add(accion3);
         return nodos;
     }
 
@@ -873,22 +927,41 @@ public class AccionesNivel implements JuegoController.JuegoListener {
         String ip = obtenerIPSospechoso();
         String dispositivo = obtenerDispositivoSospechoso();
 
+        // 1. Identificar cuentas de la misma persona (Escombros)
         VBox accion1 = crearTarjetaAccion("1. Identificar cuentas de la misma persona",
-                "Examina el dashboard forense. Los datos técnicos están en la tarjeta.", 0);
+                "Debes resolver el desafío para analizar el dashboard forense.", 0);
+        tarjetasAcciones[0] = accion1;
         HBox evRed = construirEvidenciaConDatos("/images/evidencia_red_cuentas.png",
                 "DASHBOARD FORENSE — ANÁLISIS DE CUENTAS",
                 new String[][]{{"IP común",ip},{"Dispositivo",dispositivo},
                         {"Cuentas","4 perfiles diferentes"},{"Horario","Ataques entre 9pm y 11pm"},
                         {"Patrón","Mismo estilo de escritura"},{"Última acción","Hace 2 horas"}},
                 "Datos extraídos del servidor de la plataforma");
-        evRed.setStyle("-fx-cursor:hand;");
-        evRed.setOnMouseClicked(e -> completarAccion(0, accion1,
-                "4 cuentas vinculadas a la IP: " + ip,
-                "Una sola IP detrás de 4 cuentas. Misma persona.", true));
-        accion1.getChildren().add(evRed); nodos.add(accion1);
+        
+        Button btnDesafio1 = new Button("⚔  INICIAR DESAFÍO");
+        btnDesafio1.getStyleClass().add("btn-primario");
+        btnDesafio1.setMaxWidth(Double.MAX_VALUE);
+        btnDesafio1.setOnAction(e -> {
+            btnDesafio1.setDisable(true);
+            btnDesafio1.setText("⏳ Esperando al oponente...");
+            if (controller instanceof cyberdetective.controller.MultiplayerJuegoController mc) {
+                mc.enviarListoParaMinijuego(0);
+            } else {
+                int gameId = cyberdetective.minijuego.GestorMinijuegos.seleccionarIdAleatorio(0);
+                mostrarMinijuegoPopupParaAccion(gameId, 0, evRed, accion1, btnDesafio1, "4 cuentas vinculadas a la IP: " + ip, "Una sola IP detrás de 4 cuentas. Misma persona.", false);
+            }
+        });
 
+        mapaEvidencias.put(0, evRed);
+        mapaAccionesVBox.put(0, accion1);
+        mapaBtnDesafio.put(0, btnDesafio1);
+        mapaTextosCompletar.put(0, new String[]{"4 cuentas vinculadas a la IP: " + ip, "Una sola IP detrás de 4 cuentas. Misma persona."});
+        accion1.getChildren().add(btnDesafio1); nodos.add(accion1);
+
+        // 2. Encontrar patrones de comportamiento (Sincronización multijugador)
         VBox accion2 = crearTarjetaAccion("2. Encontrar patrones de comportamiento",
                 "¿Cuál de estos patrones confirma que las 4 cuentas son de la misma persona?", 1);
+        tarjetasAcciones[1] = accion2;
         String[] patrones = {
                 "Misma IP, mismo dispositivo y horarios idénticos de actividad",
                 "Todas las cuentas tienen el mismo número de seguidores",
@@ -896,57 +969,70 @@ public class AccionesNivel implements JuegoController.JuegoListener {
                 "Las cuentas fueron creadas en el mismo año"
         };
         VBox opcionesP = new VBox(8);
+        mapaOpcionesVBox.put(1, opcionesP); // Para sincronizar multijugador
+        
         for (int i = 0; i < patrones.length; i++) {
+            final int finalI = i;
             final boolean ok = i == 0;
             Button btn = new Button(patrones[i]);
             btn.getStyleClass().add("btn-opcion"); btn.setMaxWidth(Double.MAX_VALUE); btn.setWrapText(true);
             btn.setOnAction(e -> {
-                if (ok) {
-                    completarAccion(1, accion2, "Patrón: misma IP, dispositivo y horarios.",
-                            "Exacto. Ese patrón forense es la prueba más sólida.", true);
-                    opcionesP.getChildren().forEach(n -> { if (n instanceof Button b) b.setDisable(true); });
-                    btn.getStyleClass().add("btn-opcion-correcto");
+                if (controller instanceof cyberdetective.controller.MultiplayerJuegoController mc) {
+                    mc.intentarAccionInvestigacion(1, ok);
                 } else {
-                    btn.getStyleClass().add("btn-opcion-incorrecto");
-                    labelMensajeAlex.setText("Ese patrón no es evidencia forense suficiente.");
-                    PauseTransition p = new PauseTransition(Duration.millis(800));
-                    p.setOnFinished(ig -> btn.getStyleClass().remove("btn-opcion-incorrecto")); p.play();
+                    if (ok) {
+                        completarAccion(1, accion2, "Patrón: misma IP, dispositivo y horarios.",
+                                "Exacto. Ese patrón forense es la prueba más sólida.", true);
+                        opcionesP.getChildren().forEach(n -> { if (n instanceof Button b) b.setDisable(true); });
+                        btn.getStyleClass().add("btn-opcion-correcto");
+                    } else {
+                        btn.getStyleClass().add("btn-opcion-incorrecto");
+                        labelMensajeAlex.setText("Ese patrón no es evidencia forense suficiente.");
+                        PauseTransition p = new PauseTransition(Duration.millis(800));
+                        p.setOnFinished(ig -> btn.getStyleClass().remove("btn-opcion-incorrecto")); p.play();
+                    }
                 }
             });
             opcionesP.getChildren().add(btn);
         }
         accion2.getChildren().add(opcionesP); nodos.add(accion2);
 
+        // 3. Identificar al responsable principal (Conexiones)
         VBox accion3 = crearTarjetaAccion("3. Identificar al responsable principal",
-                "Con todos los patrones y evidencias, ¿quién es el responsable?", 2);
+                "Conecta la IP con el sospechoso correspondiente.", 2);
+        tarjetasAcciones[2] = accion3;
 
-        Label hintL4 = new Label("Recuerda revisar en los incidentes del árbol AVL y en las evidencias recolectadas que de pronto ahí se encuentra el nombre del usuario asociado a la IP y dispositivo.");
-        hintL4.setStyle("-fx-font-size:13px; -fx-text-fill:#e0e0f0; -fx-font-weight:bold; -fx-wrap-text:true;");
-        hintL4.setWrapText(true);
-        accion3.getChildren().add(hintL4);
+        Button btnDesafio3 = new Button("⚔  INICIAR DESAFÍO");
+        btnDesafio3.getStyleClass().add("btn-primario");
+        btnDesafio3.setMaxWidth(Double.MAX_VALUE);
+        btnDesafio3.setOnAction(e -> {
+            btnDesafio3.setDisable(true);
+            btnDesafio3.setText("⏳ Esperando al oponente...");
+            if (controller instanceof cyberdetective.controller.MultiplayerJuegoController mc) {
+                mc.enviarListoParaMinijuego(2);
+            } else {
+                int gameId = cyberdetective.minijuego.GestorMinijuegos.seleccionarIdAleatorio(2);
+                mostrarMinijuegoPopupParaAccion(gameId, 2, null, accion3, btnDesafio3, "Responsable: " + controller.getSospechoso(), "Tenemos evidencias para presentar todos los cargos.", false);
+            }
+        });
 
-        VBox opcionesR = new VBox(8);
-        String sospReal4 = controller.getSospechoso();
-        for (String s : getSospechososOrdenados()) {
-            final boolean ok = s.equals(sospReal4);
-            Button btn = new Button(s);
-            btn.getStyleClass().add("btn-opcion"); btn.setMaxWidth(Double.MAX_VALUE);
-            btn.setOnAction(e -> {
-                if (ok) {
-                    completarAccion(2, accion3, "Responsable: " + sospReal4,
-                            "Tenemos evidencias para presentar todos los cargos.", true);
-                    opcionesR.getChildren().forEach(n -> { if (n instanceof Button b) b.setDisable(true); });
-                    btn.getStyleClass().add("btn-opcion-correcto");
-                } else {
-                    btn.getStyleClass().add("btn-opcion-incorrecto");
-                    labelMensajeAlex.setText("No es ese. Cruza la IP con los patrones.");
-                    PauseTransition p = new PauseTransition(Duration.millis(800));
-                    p.setOnFinished(ig -> btn.getStyleClass().remove("btn-opcion-incorrecto")); p.play();
-                }
-            });
-            opcionesR.getChildren().add(btn);
-        }
-        accion3.getChildren().add(opcionesR); nodos.add(accion3);
+        String sospReal = controller.getSospechoso();
+        String[] sospechosos = getSospechososOrdenados();
+        int realIdx = obtenerIndiceSospechoso();
+        String[] ips = {"192.168.100.22", ip, "10.10.10.1", "172.20.0.55"};
+
+        String dataConexion = String.format("%s:%s|*%s:%s|%s:%s|%s:%s",
+                ips[0], sospechosos[(realIdx+1)%4],
+                ip, sospReal,
+                ips[2], sospechosos[(realIdx+2)%4],
+                ips[3], sospechosos[(realIdx+3)%4]);
+
+        mapaDatosExtra.put(2, dataConexion);
+        mapaAccionesVBox.put(2, accion3);
+        mapaBtnDesafio.put(2, btnDesafio3);
+        mapaTextosCompletar.put(2, new String[]{"Responsable: " + sospReal, "Tenemos evidencias para presentar todos los cargos."});
+
+        accion3.getChildren().add(btnDesafio3); nodos.add(accion3);
         return nodos;
     }
 
@@ -1116,7 +1202,32 @@ public class AccionesNivel implements JuegoController.JuegoListener {
         if (visualizadorArbol != null) visualizadorArbol.actualizar(controller.getArbol());
     }
     @Override public void onJuegoTerminado(String r) {}
-    @Override public void onMensajeDetective(String m) {}
+    @Override public void onPuntajeActualizado(int p) {
+        javafx.application.Platform.runLater(() -> {
+            if (labelPuntaje != null) labelPuntaje.setText(String.valueOf(p));
+            if (barraPuntajeYo != null) barraPuntajeYo.setProgress(Math.min(1.0, (double) p / 1000.0));
+        });
+    }
+    @Override public void onPuntajeOponenteActualizado(int p) {
+        javafx.application.Platform.runLater(() -> {
+            if (labelPuntajeOponente != null) labelPuntajeOponente.setText(String.valueOf(p));
+            if (barraPuntajeOponente != null) barraPuntajeOponente.setProgress(Math.min(1.0, (double) p / 1000.0));
+        });
+    }
+    @Override public void onInterrogatorioListo() {
+        javafx.application.Platform.runLater(() -> mostrarFasePreguntas());
+    }
+    @Override public void onNivel5CronologiaListo() {
+        javafx.application.Platform.runLater(() -> mostrarAnalisisNodos());
+    }
+    @Override public void onNivel5ReporteFinalListo() {
+        javafx.application.Platform.runLater(() -> mostrarReporteFinal());
+    }
+    @Override public void onMensajeDetective(String m) {
+        javafx.application.Platform.runLater(() -> {
+            if (labelMensajeAlex != null) labelMensajeAlex.setText(m);
+        });
+    }
     @Override public void onFaseCambiada(cyberdetective.controller.JuegoController.FaseNivel f) {}
     @Override public void onEvidenciaRevelada(String e, int tr, int t) {
         javafx.application.Platform.runLater(() -> {
@@ -1271,59 +1382,85 @@ public class AccionesNivel implements JuegoController.JuegoListener {
         String[][] preguntas = controller.getPreguntasNivelActual();
         int idx = controller.getPreguntaActual();
         String[] pregunta = preguntas[idx];
+        int totalOpciones = pregunta.length - 2;
 
         Label etqFase = new Label("INTERROGATORIO — FASE 2 DE 3");
         etqFase.setStyle("-fx-font-size:10px;-fx-font-weight:700;-fx-text-fill:#00d4ff;-fx-letter-spacing:0.12em;");
 
-        Label numP = new Label("PREGUNTA " + (idx + 1) + " DE " + preguntas.length);
+        Label numP = new Label("PREGUNTA " + (idx+1) + " DE " + preguntas.length);
         numP.setStyle("-fx-font-size:10px;-fx-font-weight:600;-fx-text-fill:#3a3a5c;-fx-letter-spacing:0.1em;");
 
         Label enunciado = new Label(pregunta[0]); enunciado.setWrapText(true);
         enunciado.setStyle("-fx-font-size:15px;-fx-font-weight:500;-fx-text-fill:#e0e0f0;-fx-line-spacing:4;");
         VBox.setMargin(enunciado, new Insets(8, 0, 12, 0));
 
-        boolean multiplayer = (controller instanceof cyberdetective.controller.MultiplayerJuegoController);
-
-        VBox contenedor = new VBox(16);
-        contenedor.setStyle("-fx-background-color:#0f0f1a;-fx-border-color:#1e1e2e;" +
-                "-fx-border-width:1;-fx-border-radius:12;-fx-background-radius:12;-fx-padding:24 28 24 28;");
-
-        if (multiplayer) {
-            // — Modo multijugador: botón que espera a ambos jugadores —
-            Label hint = new Label("⚠  Debes resolver un desafío para responder esta pregunta.");
-            hint.setStyle("-fx-text-fill:#6b6b8a;-fx-font-size:12px;");
-
-            Button btnDesafio = new Button("⚔  INICIAR DESAFÍo");
-            btnDesafio.getStyleClass().add("btn-primario");
-            btnDesafio.setMaxWidth(Double.MAX_VALUE);
-            btnDesafio.setOnAction(e -> {
-                btnDesafio.setDisable(true);
-                btnDesafio.setText("⏳ Esperando al otro detective...");
-                labelMensajeAlex.setText("Esperando a que el otro jugador esté listo para el desafío...");
-                cyberdetective.controller.MultiplayerJuegoController mc =
-                    (cyberdetective.controller.MultiplayerJuegoController) controller;
-                mc.enviarListoParaMinijuego(idx);
-            });
-
-            contenedor.getChildren().addAll(numP, enunciado, hint, btnDesafio);
-        } else {
-            // — Modo solitario: lanza el minijuego directamente —
-            Button btnDesafio = new Button("⚔  RESOLVER DESAFÍo");
-            btnDesafio.getStyleClass().add("btn-primario");
-            btnDesafio.setMaxWidth(Double.MAX_VALUE);
-            btnDesafio.setOnAction(e -> {
-                int gameId = GestorMinijuegos.seleccionarIdAleatorio(idx);
-                mostrarMinijuegoPopup(gameId, idx, false);
-            });
-            contenedor.getChildren().addAll(numP, enunciado, btnDesafio);
+        opcionesBoxInterrogatorio = new VBox(10);
+        for (int i = 1; i <= totalOpciones; i++) {
+            final int oi = i - 1;
+            Button btn = new Button(pregunta[i]);
+            btn.getStyleClass().add("btn-opcion"); btn.setMaxWidth(Double.MAX_VALUE); btn.setWrapText(true);
+            btn.setOnAction(e -> evaluarRespuesta(oi, opcionesBoxInterrogatorio, pregunta));
+            opcionesBoxInterrogatorio.getChildren().add(btn);
         }
 
+        VBox contenedor = new VBox(12);
+        contenedor.setStyle("-fx-background-color:#0f0f1a;-fx-border-color:#1e1e2e;" +
+                "-fx-border-width:1;-fx-border-radius:12;-fx-background-radius:12;-fx-padding:24 28 24 28;");
+        contenedor.getChildren().addAll(numP, enunciado, opcionesBoxInterrogatorio);
         setCentral(etqFase, contenedor);
     }
 
-    /** Abre el popup del minijuego sobre la pantalla actual. */
-    private void mostrarMinijuegoPopup(int gameId, int qIdx, boolean multiplayer) {
-        Minijuego juego = GestorMinijuegos.crearMinijuego(gameId);
+    private java.util.Map<Integer, javafx.scene.Node> mapaEvidencias = new java.util.HashMap<>();
+    private java.util.Map<Integer, VBox> mapaAccionesVBox = new java.util.HashMap<>();
+    private java.util.Map<Integer, VBox> mapaOpcionesVBox = new java.util.HashMap<>();
+    private java.util.Map<Integer, Button> mapaBtnDesafio = new java.util.HashMap<>();
+    private java.util.Map<Integer, String[]> mapaTextosCompletar = new java.util.HashMap<>();
+    private java.util.Map<Integer, String> mapaDatosExtra = new java.util.HashMap<>();
+    private StackPane minijuegoOverlayActivo = null;
+
+    private String nombreDesafio(int id) {
+        switch (id) {
+            case 1: return "Escombros";
+            case 2: return "Escombros II";
+            case 3: return "Escombros III";
+            case 4: case 5: case 6: return "Sopa de Letras";
+            case 7: case 8: case 9: return "Conexión";
+            default: return "Desafío " + id;
+        }
+    }
+
+    private String instruccionDesafio(int id) {
+        switch (id) {
+            case 1: case 2: case 3:
+                return "Arrastra los escombros fuera del centro para descubrir la evidencia oculta. " +
+                       "¡Haz clic en la evidencia cuando quede despejada!";
+            case 4: case 5: case 6:
+                return "Encuentra la palabra oculta seleccionando las letras correctas.";
+            case 7: case 8: case 9:
+                return "Conecta cada concepto con su definición correcta haciendo clic en ambos.";
+            default:
+                return "Resuelve el desafío para responder la pregunta.";
+        }
+    }
+
+    /** Abre el popup del minijuego para la fase de acciones. */
+    private void mostrarMinijuegoPopupParaAccion(int gameId, int accionIdx, javafx.scene.Node evidenciaVirtual, VBox accionCard, Button btnDesafio, String txtTitulo, String txtSub, boolean multiplayer) {
+        cyberdetective.minijuego.Minijuego juego = cyberdetective.minijuego.GestorMinijuegos.crearMinijuego(gameId);
+        juego.setEvidenciaNode(evidenciaVirtual);
+        if (mapaDatosExtra.containsKey(accionIdx)) {
+            juego.setDatosExtra(mapaDatosExtra.get(accionIdx));
+        }
+
+        if (nivel == 3 && juego instanceof cyberdetective.minijuego.SopaLetrasMinijuego sopa) {
+            sopa.setModoIP(true);
+        }
+
+        juego.setOnVerEvidenciaRequest(() -> {
+            Caso c = controller.getCasoActualFijo();
+            if (c != null) {
+                mostrarPopupEvidencia(c);
+            }
+        });
 
         // — Título —
         Label titulo = new Label("🎮  DESAFÍo: " + nombreDesafio(gameId));
@@ -1340,13 +1477,15 @@ public class AccionesNivel implements JuegoController.JuegoListener {
         popupContent.setAlignment(Pos.TOP_CENTER);
         popupContent.setStyle("-fx-background-color:#0d0d1a;-fx-border-color:#00d4ff40;" +
                 "-fx-border-width:2;-fx-border-radius:16;-fx-background-radius:16;-fx-padding:0 0 20 0;");
-        popupContent.setMaxWidth(700);
-        popupContent.setMaxHeight(560);
+        popupContent.setMaxWidth(750);
+        popupContent.setMaxHeight(750);
 
         // — Overlay semitransparente —
         StackPane overlay = new StackPane(popupContent);
         overlay.setStyle("-fx-background-color:rgba(0,0,0,0.78);");
         overlay.setPrefSize(stage.getWidth(), stage.getHeight());
+
+        minijuegoOverlayActivo = overlay;
 
         // Insertar overlay sobre el stackCentral o el root
         if (stackCentral != null) {
@@ -1362,17 +1501,22 @@ public class AccionesNivel implements JuegoController.JuegoListener {
         juego.setOnJuegoTerminado(tiempoMs -> {
             javafx.application.Platform.runLater(() -> {
                 // Quitar overlay
-                if (stackCentral != null) stackCentral.getChildren().remove(overlay);
-                else ((StackPane) root.getCenter()).getChildren().remove(overlay);
+                if (minijuegoOverlayActivo != null) {
+                    if (stackCentral != null) stackCentral.getChildren().remove(minijuegoOverlayActivo);
+                    else ((StackPane) root.getCenter()).getChildren().remove(minijuegoOverlayActivo);
+                    minijuegoOverlayActivo = null;
+                }
 
                 if (mc != null) {
                     // Multijugador: notificar al servidor y esperar MINIGAME_RESOLVED
-                    mc.enviarMinijuegoCompletado(qIdx, tiempoMs);
-                    labelMensajeAlex.setText("⏳ Desafío completado! Esperando al otro detective...");
+                    mc.enviarMinijuegoCompletado(accionIdx, tiempoMs);
+                    labelMensajeAlex.setText("⏳ Desafío completado! Esperando resultado...");
                 } else {
-                    // Solitario: aplicar puntaje localmente y avanzar
-                    controller.responderPregunta(0); // fuerza pregunta correcta localmente
-                    mostrarSiguientePregunta();
+                    // Solitario: aplicar puntaje y revelar
+                    completarAccion(accionIdx, accionCard, txtTitulo, txtSub, true);
+                    accionCard.getChildren().remove(btnDesafio);
+                    evidenciaVirtual.setStyle("-fx-cursor:default;");
+                    accionCard.getChildren().add(evidenciaVirtual);
                 }
             });
         });
@@ -1380,36 +1524,26 @@ public class AccionesNivel implements JuegoController.JuegoListener {
         juego.iniciar();
     }
 
-    private String nombreDesafio(int id) {
-        switch (id) {
-            case 1: return "Escombros";
-            case 2: return "Escombros II";
-            case 3: return "Escombros III";
-            default: return "Desafío " + id;
-        }
-    }
-
-    private String instruccionDesafio(int id) {
-        switch (id) {
-            case 1: case 2: case 3:
-                return "Arrastra los escombros fuera del centro para descubrir la evidencia oculta. " +
-                       "¡Haz clic en la evidencia cuando quede despejada!";
-            default:
-                return "Resuelve el desafío para responder la pregunta.";
-        }
-    }
-
     @Override
-    public void onMinijuegoIniciado(int gameId, int qIdx) {
+    public void onMinijuegoIniciado(int gameId, int accionIdx) {
         javafx.application.Platform.runLater(() -> {
             labelMensajeAlex.setText("⚔ ¡Desafío iniciado! ¡Sé el primero en resolver!");
-            mostrarMinijuegoPopup(gameId, qIdx, true);
+            if (mapaAccionesVBox.containsKey(accionIdx)) {
+                mostrarMinijuegoPopupParaAccion(gameId, accionIdx, mapaEvidencias.get(accionIdx), mapaAccionesVBox.get(accionIdx), mapaBtnDesafio.get(accionIdx), mapaTextosCompletar.get(accionIdx)[0], mapaTextosCompletar.get(accionIdx)[1], true);
+            }
         });
     }
 
     @Override
-    public void onMinijuegoResuelto(String ganador, int qIdx, boolean soyYo) {
+    public void onMinijuegoResuelto(String ganador, int accionIdx, boolean soyYo) {
         javafx.application.Platform.runLater(() -> {
+            // Cerrar el popup para ambos jugadores
+            if (minijuegoOverlayActivo != null) {
+                if (stackCentral != null) stackCentral.getChildren().remove(minijuegoOverlayActivo);
+                else ((StackPane) root.getCenter()).getChildren().remove(minijuegoOverlayActivo);
+                minijuegoOverlayActivo = null;
+            }
+
             if (soyYo) {
                 labelMensajeAlex.setText("★ ¡GANASTE el desafío! +50 puntos.");
                 labelMensajeAlex.setStyle("-fx-text-fill:#00ff88;-fx-font-weight:bold;");
@@ -1417,10 +1551,31 @@ public class AccionesNivel implements JuegoController.JuegoListener {
                 labelMensajeAlex.setText("✖ " + ganador.toUpperCase() + " ganó el desafío. +0 puntos.");
                 labelMensajeAlex.setStyle("-fx-text-fill:#ff9f1c;-fx-font-weight:bold;");
             }
+            
             PauseTransition pausa = new PauseTransition(Duration.millis(2500));
             pausa.setOnFinished(e -> {
                 labelMensajeAlex.setStyle("");
-                mostrarSiguientePregunta();
+                if (mapaAccionesVBox.containsKey(accionIdx)) {
+                    VBox card = mapaAccionesVBox.get(accionIdx);
+                    Button btn = mapaBtnDesafio.get(accionIdx);
+                    
+                    card.getChildren().remove(btn);
+                    
+                    if (mapaEvidencias.containsKey(accionIdx)) {
+                        javafx.scene.Node ev = mapaEvidencias.get(accionIdx);
+                        ev.setStyle("-fx-cursor:default;");
+                        if (!card.getChildren().contains(ev)) {
+                            card.getChildren().add(ev);
+                        }
+                    }
+                    
+                    if (soyYo) {
+                        String[] txts = mapaTextosCompletar.get(accionIdx);
+                        completarAccion(accionIdx, card, txts[0], txts[1], false);
+                    } else {
+                        marcarAccionOponente(accionIdx, card);
+                    }
+                }
             });
             pausa.play();
         });
@@ -1485,25 +1640,7 @@ public class AccionesNivel implements JuegoController.JuegoListener {
         });
     }
 
-    @Override
-    public void onPuntajeActualizado(int p) {
-        javafx.application.Platform.runLater(() -> {
-            if (labelPuntaje != null) {
-                labelPuntaje.setText(String.valueOf(p));
-                barraPuntajeYo.setProgress(Math.min(1.0, (double)p / 1000.0));
-            }
-        });
-    }
 
-    @Override
-    public void onPuntajeOponenteActualizado(int p) {
-        javafx.application.Platform.runLater(() -> {
-            if (labelPuntajeOponente != null) {
-                labelPuntajeOponente.setText(String.valueOf(p));
-                barraPuntajeOponente.setProgress(Math.min(1.0, (double)p / 1000.0));
-            }
-        });
-    }
 
     @Override
     public void onOponenteDesconectado(String nombre) {
@@ -1799,16 +1936,31 @@ public class AccionesNivel implements JuegoController.JuegoListener {
             feedbackLabel.setStyle("-fx-font-size:13px;-fx-text-fill:#00ff88;-fx-line-spacing:2;");
             siguienteCorrecto++;
 
+            if (controller instanceof cyberdetective.controller.MultiplayerJuegoController mc) {
+                mc.intentarAccionInvestigacion(100, true);
+            }
+
             if (siguienteCorrecto == ordenCorrecto.size()) {
                 feedbackLabel.setText("✓ Perfecto. Recorrido inorden completado. El árbol AVL organizó los delitos de menor a mayor gravedad.");
                 PauseTransition pausa = new PauseTransition(Duration.millis(1200));
-                pausa.setOnFinished(ev -> mostrarAnalisisNodos()); pausa.play();
+                pausa.setOnFinished(ev -> {
+                    if (controller instanceof cyberdetective.controller.MultiplayerJuegoController mc) {
+                        feedbackLabel.setText("✓ Esperando a que el oponente termine de organizar por gravedad...");
+                        mc.enviarListoCronologiaNivel5();
+                    } else {
+                        mostrarAnalisisNodos();
+                    }
+                });
+                pausa.play();
             } else {
                 feedbackLabel.setText("✓ Correcto — " + casoElegido.getTipoAcoso() +
                         " (G:" + casoElegido.getGravedad() + "). Selecciona el siguiente delito más grave.");
             }
         } else {
             intentosFallidos++;
+            if (controller instanceof cyberdetective.controller.MultiplayerJuegoController mc) {
+                mc.intentarAccionInvestigacion(100, false);
+            }
             feedbackLabel.setStyle("-fx-font-size:13px;-fx-text-fill:#ff4466;-fx-line-spacing:2;");
             feedbackLabel.setText("✗ Ese delito tiene gravedad " + casoElegido.getGravedad() +
                     " — no es el siguiente. Busca el caso menos grave disponible.");
@@ -1909,6 +2061,9 @@ public class AccionesNivel implements JuegoController.JuegoListener {
             btnSeleccionar.setOnAction(e -> {
                 int siguienteCronologico = seleccionados.size() + 1;
                 if (c.getOrdenCronologico() == siguienteCronologico) {
+                    if (controller instanceof cyberdetective.controller.MultiplayerJuegoController mc) {
+                        mc.intentarAccionInvestigacion(101, true);
+                    }
                     disponibles.remove(c);
                     seleccionados.add(c);
                     labelMensajeAlex.setText("¡Excelente! La marca de tiempo coincide con la progresión del caso.");
@@ -1919,12 +2074,23 @@ public class AccionesNivel implements JuegoController.JuegoListener {
                         Button btnFin = new Button("Generar Reporte Final →");
                         btnFin.getStyleClass().add("btn-primario");
                         btnFin.setPadding(new Insets(15, 30, 15, 30));
-                        btnFin.setOnAction(ev -> mostrarReporteFinal());
+                        btnFin.setOnAction(ev -> {
+                            if (controller instanceof cyberdetective.controller.MultiplayerJuegoController mc) {
+                                btnFin.setDisable(true);
+                                btnFin.setText("⏳ Esperando al oponente...");
+                                mc.enviarListoReporteFinalNivel5();
+                            } else {
+                                mostrarReporteFinal();
+                            }
+                        });
                         linea.getChildren().add(btnFin);
                     }
                 } else {
                     intentosFallidos++;
-                    labelMensajeAlex.setText("⚠ Error Cronológico: Ese evento no ocurrió en este punto. Revisa los meses/días.");
+                    if (controller instanceof cyberdetective.controller.MultiplayerJuegoController mc) {
+                        mc.intentarAccionInvestigacion(101, false);
+                    }
+                    labelMensajeAlex.setText("⚠ Error Cronológico: Ese evento no ocurrió en este punto. Revisa los meses/días. (-25 pts)");
                 }
             });
 

@@ -79,6 +79,15 @@ public class GameServer {
         }
     }
 
+    /** Envía el mensaje a todos los clientes EXCEPTO al emisor (para no rebotar el propio mensaje). */
+    public synchronized void sendToOther(GameMessage msg, String senderName) {
+        for (ClientHandler client : clients) {
+            if (!senderName.equals(client.getPlayerName())) {
+                client.send(msg);
+            }
+        }
+    }
+
     public synchronized void handleAction(GameMessage msg) {
         String data = (String) msg.getData();
         if (data != null && data.startsWith("ANSWER:")) {
@@ -153,6 +162,9 @@ public class GameServer {
                     }
                 }
             }
+        } else if (data != null && data.startsWith("PHASE2_SCORE_UPDATE:")) {
+            String score = data.split(":")[1];
+            sendToOther(new GameMessage(GameMessage.Type.ACTION, "OPPONENT_SCORE_P2:" + score, msg.getSender()), msg.getSender());
         } else if ("REVEAL_EVIDENCE".equals(data)) {
             broadcast(new GameMessage(GameMessage.Type.ACTION, "OPPONENT_REVEALED", msg.getSender()));
         } else if (data != null && data.startsWith("LEVEL_READY:")) {
@@ -172,6 +184,33 @@ public class GameServer {
                 if (avlReadyPlayers.size() >= 2) {
                     broadcast(new GameMessage(GameMessage.Type.ACTION, "AVL_START:go", "SERVER"));
                     avlReadyPlayers.clear();
+                }
+            }
+        } else if ("INTERROGATION_READY".equals(data)) {
+            synchronized(this) {
+                interrogationReadyPlayers.add(msg.getSender());
+                System.out.println("Detective " + msg.getSender() + " listo para el interrogatorio.");
+                if (interrogationReadyPlayers.size() >= 2) {
+                    broadcast(new GameMessage(GameMessage.Type.ACTION, "INTERROGATION_START:go", "SERVER"));
+                    interrogationReadyPlayers.clear();
+                }
+            }
+        } else if ("NIVEL5_CHRONO_READY".equals(data)) {
+            synchronized(this) {
+                nivel5ChronoReadyPlayers.add(msg.getSender());
+                System.out.println("Detective " + msg.getSender() + " listo para la cronología.");
+                if (nivel5ChronoReadyPlayers.size() >= 2) {
+                    broadcast(new GameMessage(GameMessage.Type.ACTION, "NIVEL5_CHRONO_START:go", "SERVER"));
+                    nivel5ChronoReadyPlayers.clear();
+                }
+            }
+        } else if ("NIVEL5_REPORT_READY".equals(data)) {
+            synchronized(this) {
+                nivel5ReportReadyPlayers.add(msg.getSender());
+                System.out.println("Detective " + msg.getSender() + " listo para el reporte final.");
+                if (nivel5ReportReadyPlayers.size() >= 2) {
+                    broadcast(new GameMessage(GameMessage.Type.ACTION, "NIVEL5_REPORT_START:go", "SERVER"));
+                    nivel5ReportReadyPlayers.clear();
                 }
             }
         } else if (data != null && data.startsWith("MINIGAME_READY:")) {
@@ -211,6 +250,9 @@ public class GameServer {
     private Set<String> actionRespondedPlayers = new HashSet<>();
     private Set<String> readyPlayers = new HashSet<>();
     private Set<String> avlReadyPlayers = new HashSet<>();
+    private Set<String> interrogationReadyPlayers = new HashSet<>();
+    private Set<String> nivel5ChronoReadyPlayers = new HashSet<>();
+    private Set<String> nivel5ReportReadyPlayers = new HashSet<>();
     // Minijuegos
     private Set<String> minigameReadyPlayers = new HashSet<>();
     private int currentMinigameQIdx = -1;

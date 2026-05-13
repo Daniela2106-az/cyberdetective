@@ -64,7 +64,14 @@ public class EscombroMinijuego extends Minijuego {
         getChildren().add(instruccion);
 
         // ── Evidencia central (oculta inicialmente) ──
-        evidencia = construirEvidencia();
+        if (evidenciaVirtual != null) {
+            evidencia = new StackPane(evidenciaVirtual);
+            // Hacer la tarjeta un poco más pequeña para que quepa bien en el minijuego
+            evidencia.setScaleX(0.7);
+            evidencia.setScaleY(0.7);
+        } else {
+            evidencia = construirEvidenciaDummy();
+        }
         evidencia.setLayoutX(EV_X);
         evidencia.setLayoutY(EV_Y);
         evidencia.setOpacity(0.15);
@@ -101,7 +108,7 @@ public class EscombroMinijuego extends Minijuego {
 
     // ── Builder helpers ───────────────────────────────────────────────────
 
-    private StackPane construirEvidencia() {
+    private StackPane construirEvidenciaDummy() {
         Rectangle bg = new Rectangle(EV_W, EV_H);
         bg.setArcWidth(12); bg.setArcHeight(12);
         bg.setFill(Color.web("#1a1a3a"));
