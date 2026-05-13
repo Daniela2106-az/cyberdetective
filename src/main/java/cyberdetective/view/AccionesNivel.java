@@ -1653,8 +1653,8 @@ public class AccionesNivel implements JuegoController.JuegoListener {
         });
     }
 
-    @Override
-    public void onArbolListoParaInsertar() {
+    @Override public void onArbolListoParaInsertar() {
+        System.out.println("Activando mostrarFaseInsercion en UI...");
         javafx.application.Platform.runLater(() -> mostrarFaseInsercion());
     }
 

@@ -175,15 +175,22 @@ public class GameServer {
                     String levelIdx = data.split(":")[1];
                     broadcast(new GameMessage(GameMessage.Type.ACTION, "START_LEVEL:" + levelIdx, "SERVER"));
                     readyPlayers.clear();
+                    // Limpiar estados de sincronización previos para evitar bloqueos
+                    avlReadyPlayers.clear();
+                    interrogationReadyPlayers.clear();
+                    nivel5ChronoReadyPlayers.clear();
+                    nivel5ReportReadyPlayers.clear();
+                    System.out.println("Nivel " + levelIdx + " iniciado. Estados de sincronización limpiados.");
                 }
             }
         } else if ("AVL_READY".equals(data)) {
             synchronized(this) {
                 avlReadyPlayers.add(msg.getSender());
-                System.out.println("Detective " + msg.getSender() + " listo para insertar en AVL.");
+                System.out.println("Detective " + msg.getSender() + " listo para insertar en AVL. (Total: " + avlReadyPlayers.size() + "/2)");
                 if (avlReadyPlayers.size() >= 2) {
                     broadcast(new GameMessage(GameMessage.Type.ACTION, "AVL_START:go", "SERVER"));
                     avlReadyPlayers.clear();
+                    System.out.println("Sincronización AVL completa. Mensaje START enviado.");
                 }
             }
         } else if ("INTERROGATION_READY".equals(data)) {

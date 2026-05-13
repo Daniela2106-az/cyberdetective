@@ -229,6 +229,7 @@ public class MultiplayerJuegoController extends JuegoController {
             } else if (data.startsWith("NIVEL5_REPORT_START:")) {
                 for (JuegoListener l : listeners) l.onNivel5ReporteFinalListo();
             } else if (data.startsWith("AVL_START:")) {
+                System.out.println("Mensaje AVL_START recibido. Notificando a los listeners...");
                 for (JuegoListener l : listeners) l.onArbolListoParaInsertar();
             } else if (data.startsWith("OPPONENT_SCORE_P2:")) {
                 String[] parts = data.split(":");
