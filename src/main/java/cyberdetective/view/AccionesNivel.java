@@ -66,8 +66,6 @@ public class AccionesNivel implements JuegoController.JuegoListener {
     
     private Label labelPuntaje;
     private Label labelPuntajeOponente;
-    private ProgressBar barraPuntajeYo;
-    private ProgressBar barraPuntajeOponente;
 
     public AccionesNivel(Stage stage, JuegoController controller,
                          MapaInvestigacion mapa) {
@@ -174,24 +172,22 @@ public class AccionesNivel implements JuegoController.JuegoListener {
         labelPuntaje = new Label(String.valueOf(controller.getPuntaje()));
         labelPuntaje.getStyleClass().add("puntaje-label");
         labelPuntaje.setStyle("-fx-font-size: 20px;");
-        barraPuntajeYo = new ProgressBar(Math.min(1.0, (double)controller.getPuntaje() / 1000.0));
-        barraPuntajeYo.setPrefWidth(80);
-        barraPuntajeYo.setPrefHeight(4);
-        barraPuntajeYo.setStyle("-fx-accent: #00d4ff;");
-        myBox.getChildren().addAll(myTitle, labelPuntaje, barraPuntajeYo);
+        myBox.getChildren().addAll(myTitle, labelPuntaje);
         
         // Oponente
         VBox opBox = new VBox(2);
         Label opTitle = new Label("OPONENTE");
         opTitle.setStyle("-fx-font-size: 9px; -fx-text-fill: #ff9f1c; -fx-font-weight: bold;");
-        labelPuntajeOponente = new Label("0");
+        
+        int puntosOp = 0;
+        if (controller instanceof cyberdetective.controller.MultiplayerJuegoController mc) {
+            puntosOp = mc.getOponentePuntaje();
+        }
+        
+        labelPuntajeOponente = new Label(String.valueOf(puntosOp));
         labelPuntajeOponente.getStyleClass().add("puntaje-label");
         labelPuntajeOponente.setStyle("-fx-font-size: 20px; -fx-text-fill: #ff9f1c;");
-        barraPuntajeOponente = new ProgressBar(0);
-        barraPuntajeOponente.setPrefWidth(80);
-        barraPuntajeOponente.setPrefHeight(4);
-        barraPuntajeOponente.setStyle("-fx-accent: #ff9f1c;");
-        opBox.getChildren().addAll(opTitle, labelPuntajeOponente, barraPuntajeOponente);
+        opBox.getChildren().addAll(opTitle, labelPuntajeOponente);
         
         Separator sep = new Separator(javafx.geometry.Orientation.VERTICAL);
         sep.setStyle("-fx-background-color: #2a2a3c;");
@@ -977,21 +973,20 @@ public class AccionesNivel implements JuegoController.JuegoListener {
             Button btn = new Button(patrones[i]);
             btn.getStyleClass().add("btn-opcion"); btn.setMaxWidth(Double.MAX_VALUE); btn.setWrapText(true);
             btn.setOnAction(e -> {
-                if (controller instanceof cyberdetective.controller.MultiplayerJuegoController mc) {
-                    mc.intentarAccionInvestigacion(1, ok);
-                } else {
-                    if (ok) {
+                procesarAccionBoton(1, ok, opcionesP, btn,
+                    () -> {
                         completarAccion(1, accion2, "Patrón: misma IP, dispositivo y horarios.",
                                 "Exacto. Ese patrón forense es la prueba más sólida.", true);
                         opcionesP.getChildren().forEach(n -> { if (n instanceof Button b) b.setDisable(true); });
                         btn.getStyleClass().add("btn-opcion-correcto");
-                    } else {
-                        btn.getStyleClass().add("btn-opcion-incorrecto");
-                        labelMensajeAlex.setText("Ese patrón no es evidencia forense suficiente.");
-                        PauseTransition p = new PauseTransition(Duration.millis(800));
-                        p.setOnFinished(ig -> btn.getStyleClass().remove("btn-opcion-incorrecto")); p.play();
-                    }
-                }
+                    },
+                    (tipo) -> {
+                        completarAccion(1, accion2, "Patrón: misma IP, dispositivo y horarios.",
+                                "El otro detective identificó el patrón primero.", false);
+                        opcionesP.getChildren().forEach(n -> { if (n instanceof Button b) b.setDisable(true); });
+                    },
+                    "Ese patrón no es evidencia forense suficiente."
+                );
             });
             opcionesP.getChildren().add(btn);
         }
@@ -1205,13 +1200,11 @@ public class AccionesNivel implements JuegoController.JuegoListener {
     @Override public void onPuntajeActualizado(int p) {
         javafx.application.Platform.runLater(() -> {
             if (labelPuntaje != null) labelPuntaje.setText(String.valueOf(p));
-            if (barraPuntajeYo != null) barraPuntajeYo.setProgress(Math.min(1.0, (double) p / 1000.0));
         });
     }
     @Override public void onPuntajeOponenteActualizado(int p) {
         javafx.application.Platform.runLater(() -> {
             if (labelPuntajeOponente != null) labelPuntajeOponente.setText(String.valueOf(p));
-            if (barraPuntajeOponente != null) barraPuntajeOponente.setProgress(Math.min(1.0, (double) p / 1000.0));
         });
     }
     @Override public void onInterrogatorioListo() {
@@ -1773,6 +1766,7 @@ public class AccionesNivel implements JuegoController.JuegoListener {
 
         if (controller.isJuegoTerminado()) {
             labelMensajeAlex.setText("¡Investigación completada! El árbol revela la verdad.");
+            controller.removerListener(this);
             mapa.regresarAlMapa();
             return;
         }
@@ -1797,7 +1791,10 @@ public class AccionesNivel implements JuegoController.JuegoListener {
 
         Button btnContinuar = new Button("Continuar investigación →");
         btnContinuar.getStyleClass().add("btn-primario");
-        btnContinuar.setOnAction(e -> mapa.regresarAlMapa());
+        btnContinuar.setOnAction(e -> {
+            controller.removerListener(this);
+            mapa.regresarAlMapa();
+        });
         HBox btnBox = new HBox(btnContinuar); btnBox.setAlignment(Pos.CENTER_RIGHT);
 
         labelMensajeAlex.setText("Nodo insertado. El árbol AVL se reorganizó. Regresa al mapa para continuar.");
@@ -1809,9 +1806,20 @@ public class AccionesNivel implements JuegoController.JuegoListener {
     // ════════════════════════════════════════════════
 
     private void mostrarNivelFinal() {
-        ordenCorrecto     = controller.getArbol().recorridoInorden();
+        // 1. Obtener los casos del árbol (ÚNICOS por ID)
+        java.util.Set<Integer> idsVistos = new java.util.HashSet<>();
+        List<Caso> todosLosCasos = new java.util.ArrayList<>();
+        for (Caso c : controller.getArbol().recorridoInorden()) {
+            if (idsVistos.add(c.getId())) {
+                todosLosCasos.add(c);
+            }
+        }
+        this.ordenCorrecto = todosLosCasos;
+        
+        // 2. Desordenar para el puzzle
         casosDesordenados = new java.util.ArrayList<>(ordenCorrecto);
         java.util.Collections.shuffle(casosDesordenados);
+        
         siguienteCorrecto = 0; intentosFallidos = 0;
         mostrarRecorridoArbol();
     }
@@ -1977,7 +1985,18 @@ public class AccionesNivel implements JuegoController.JuegoListener {
 
     /** Paso 2: analizar los nodos — reconstruir la línea de hechos. */
     private void mostrarAnalisisNodos() {
-        // 1. Desordenamos los casos para que el usuario tenga que ordenarlos
+        // 1. Obtener los casos del árbol y ordenarlos por orden cronológico (antiguo a reciente) - ÚNICOS
+        java.util.Set<Integer> idsVistos = new java.util.HashSet<>();
+        List<Caso> todosLosCasos = new java.util.ArrayList<>();
+        for (Caso c : controller.getArbol().recorridoInorden()) {
+            if (idsVistos.add(c.getId())) {
+                todosLosCasos.add(c);
+            }
+        }
+        this.ordenCorrecto = todosLosCasos;
+        this.ordenCorrecto.sort((a, b) -> Integer.compare(a.getOrdenCronologico(), b.getOrdenCronologico()));
+        
+        // 2. Desordenamos los casos para que el usuario tenga que ordenarlos
         List<Caso> casosDesordenadosPuzzle = new java.util.ArrayList<>(ordenCorrecto);
         java.util.Collections.shuffle(casosDesordenadosPuzzle);
 
@@ -2031,7 +2050,8 @@ public class AccionesNivel implements JuegoController.JuegoListener {
             
             // Pistas temporales (usamos la primera evidencia que suele tener la fecha)
             Label d = new Label(c.getEvidencias()[0]);
-            d.setStyle("-fx-text-fill: #6b6b8a; -fx-font-size: 11px;");
+            d.setWrapText(true);
+            d.setStyle("-fx-text-fill: #00ff8880; -fx-font-size: 11px;");
 
             info.getChildren().addAll(t, d);
             h.getChildren().addAll(num, info);
@@ -2054,7 +2074,7 @@ public class AccionesNivel implements JuegoController.JuegoListener {
                 pistas.getChildren().add(p);
             }
 
-            Button btnSeleccionar = new Button("Confirmar Posición #" + (seleccionados.size() + 1));
+            Button btnSeleccionar = new Button("Seleccionar");
             btnSeleccionar.setStyle(estiloBotonMonospace());
             btnSeleccionar.setMaxWidth(Double.MAX_VALUE);
 
@@ -2068,34 +2088,33 @@ public class AccionesNivel implements JuegoController.JuegoListener {
                     seleccionados.add(c);
                     labelMensajeAlex.setText("¡Excelente! La marca de tiempo coincide con la progresión del caso.");
                     actualizarPanelSeleccion(panel, disponibles, seleccionados, linea);
-
-                    if (disponibles.isEmpty()) {
-                        labelMensajeAlex.setText("Cronología completa. El historial de agresiones está listo para el reporte.");
-                        Button btnFin = new Button("Generar Reporte Final →");
-                        btnFin.getStyleClass().add("btn-primario");
-                        btnFin.setPadding(new Insets(15, 30, 15, 30));
-                        btnFin.setOnAction(ev -> {
-                            if (controller instanceof cyberdetective.controller.MultiplayerJuegoController mc) {
-                                btnFin.setDisable(true);
-                                btnFin.setText("⏳ Esperando al oponente...");
-                                mc.enviarListoReporteFinalNivel5();
-                            } else {
-                                mostrarReporteFinal();
-                            }
-                        });
-                        linea.getChildren().add(btnFin);
-                    }
                 } else {
-                    intentosFallidos++;
                     if (controller instanceof cyberdetective.controller.MultiplayerJuegoController mc) {
                         mc.intentarAccionInvestigacion(101, false);
                     }
-                    labelMensajeAlex.setText("⚠ Error Cronológico: Ese evento no ocurrió en este punto. Revisa los meses/días. (-25 pts)");
+                    labelMensajeAlex.setText("✗ Ese incidente no ocurrió en este momento. Revisa bien las fechas.");
                 }
             });
 
             tarjetaEvidencia.getChildren().addAll(etiqueta, pistas, btnSeleccionar);
             panel.getChildren().add(tarjetaEvidencia);
+        }
+
+        if (disponibles.isEmpty()) {
+            labelMensajeAlex.setText("Cronología completa. El historial de agresiones está listo para el reporte.");
+            Button btnFin = new Button("Generar Reporte Final →");
+            btnFin.getStyleClass().add("btn-primario");
+            btnFin.setPadding(new Insets(15, 30, 15, 30));
+            btnFin.setOnAction(ev -> {
+                if (controller instanceof cyberdetective.controller.MultiplayerJuegoController mc) {
+                    btnFin.setDisable(true);
+                    btnFin.setText("⏳ Esperando al oponente...");
+                    mc.enviarListoReporteFinalNivel5();
+                } else {
+                    mostrarReporteFinal();
+                }
+            });
+            panel.getChildren().add(btnFin);
         }
     }
 

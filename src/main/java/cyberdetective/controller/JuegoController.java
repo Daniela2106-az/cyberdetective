@@ -22,21 +22,21 @@ public class JuegoController {
 
     // ---------------- Estado del juego ----------------
     private ArbolAVL arbol;
-    private int nivelActual;
-    private int puntaje;
+    protected int nivelActual;
+    protected int puntaje;
     private boolean juegoTerminado;
     private List<String> logEventos;
-    private FaseNivel faseActual;
+    protected FaseNivel faseActual;
     private Caso casoDelNivelActual;
 
 
     // Evidencias descubiertas en el nivel actual (se revelan de a una)
-    private List<String> evidenciasDescubiertas;
-    private int evidenciasReveladas;
+    protected List<String> evidenciasDescubiertas;
+    protected int evidenciasReveladas;
 
     // Preguntas del nivel actual
-    private int preguntaActual;
-    private int respuestasCorrectasNivel;
+    protected int preguntaActual;
+    protected int respuestasCorrectasNivel;
 
     // Sospechosos posibles — aleatorio por partida
     private static final String[] SOSPECHOSOS = {
@@ -114,7 +114,9 @@ public class JuegoController {
     }
 
     public void agregarListener(JuegoListener listener) {
-        listeners.add(listener);
+        if (!listeners.contains(listener)) {
+            listeners.add(listener);
+        }
     }
 
     public void removerListener(JuegoListener listener) {
@@ -321,17 +323,33 @@ public class JuegoController {
      * Solo se permite después del interrogatorio.
      */
     public boolean cerrarCaso() {
-        if (faseActual != FaseNivel.INTERROGATORIO) {
-            notificarMensajeDetective(
-                    "Alex dice: Primero debes completar el interrogatorio."
-            );
-            return false;
+        if (faseActual == FaseNivel.CASO_CERRADO) {
+            System.out.println("DEBUG: El caso ya estaba cerrado. Ignorando.");
+            return true;
         }
+        System.out.println("DEBUG: Intentando cerrar caso. Fase actual: " + faseActual + ", Pregunta actual: " + preguntaActual);
+        
+        if (faseActual != FaseNivel.INTERROGATORIO) {
+            System.err.println("DEBUG: Fallo cerrarCaso - Fase incorrecta: " + faseActual);
+            // En multijugador, si ya recibimos la señal del servidor, forzamos si es necesario
+            if (this instanceof cyberdetective.controller.MultiplayerJuegoController) {
+                System.out.println("DEBUG: Forzando fase INTERROGATORIO para cerrar caso en multijugador.");
+                faseActual = FaseNivel.INTERROGATORIO;
+            } else {
+                notificarMensajeDetective("Alex dice: Primero debes completar el interrogatorio.");
+                return false;
+            }
+        }
+        
         if (hayMasPreguntas()) {
-            notificarMensajeDetective(
-                    "Alex dice: Aún faltan preguntas por responder."
-            );
-            return false;
+            System.err.println("DEBUG: Fallo cerrarCaso - Aún hay preguntas. Índice: " + preguntaActual);
+            if (this instanceof cyberdetective.controller.MultiplayerJuegoController) {
+                System.out.println("DEBUG: Forzando fin de preguntas para cerrar caso en multijugador.");
+                preguntaActual = NivelesData.getPreguntasNivel(nivelActual).length;
+            } else {
+                notificarMensajeDetective("Alex dice: Aún faltan preguntas por responder.");
+                return false;
+            }
         }
 
         Caso caso = casoDelNivelActual;
@@ -347,17 +365,21 @@ public class JuegoController {
         logEventos.add("  Gravedad: " + caso.getGravedad() + "/10");
 
         // Bonus si no tuvo errores en el interrogatorio
-        String[][] preguntas = NivelesData.getPreguntasNivel(nivelActual);
-        if (respuestasCorrectasNivel == preguntas.length) {
-            puntaje += 300;
-            logEventos.add("★ Nivel " + nivelActual + " perfecto. +300 pts bonus.");
-            notificarMensajeDetective(
-                    "Alex dice: Investigación impecable. Cerramos el caso sin dudas."
-            );
+        if (!(this instanceof cyberdetective.controller.MultiplayerJuegoController)) {
+            String[][] preguntas = NivelesData.getPreguntasNivel(nivelActual);
+            if (respuestasCorrectasNivel == preguntas.length) {
+                puntaje += 300;
+                logEventos.add("★ Nivel " + nivelActual + " perfecto. +300 pts bonus.");
+                notificarMensajeDetective(
+                        "Alex dice: Investigación impecable. Cerramos el caso sin dudas."
+                );
+            } else {
+                notificarMensajeDetective(
+                        "Alex dice: Caso cerrado. Seguimos con la siguiente capa."
+                );
+            }
         } else {
-            notificarMensajeDetective(
-                    "Alex dice: Caso cerrado. Seguimos con la siguiente capa."
-            );
+            notificarMensajeDetective("Alex dice: Caso cerrado. Sincronizando con el otro detective...");
         }
 
         notificarArbolActualizado();

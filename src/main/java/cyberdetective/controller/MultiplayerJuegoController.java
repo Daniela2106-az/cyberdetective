@@ -60,6 +60,22 @@ public class MultiplayerJuegoController extends JuegoController {
                 for (JuegoListener l : listeners) l.onRespuestaIncorrecta(failedPlayer, option, isMe);
             });
 
+        } else if (data.startsWith("SYNC_SCORE:")) {
+            // SYNC_SCORE:player:score
+            String[] parts = data.split(":");
+            String player = parts[1];
+            int score = Integer.parseInt(parts[2]);
+            boolean isMe = player.equals(getNombreJugador());
+
+            if (isMe) {
+                super.setPuntaje(score);
+            } else {
+                this.oponentePuntaje = score;
+                Platform.runLater(() -> {
+                    for (JuegoListener l : listeners) l.onPuntajeOponenteActualizado(score);
+                });
+            }
+
         } else if (data.startsWith("BOTH_FAILED:")) {
             int correcta = getOpcionCorrectaNivelActual();
             super.avanzarPreguntaSinPuntaje();
@@ -221,6 +237,15 @@ public class MultiplayerJuegoController extends JuegoController {
     public void procesarAccionServidor(String data) {
         Platform.runLater(() -> {
             if (data.startsWith("START_LEVEL:")) {
+                int nuevoNivel = Integer.parseInt(data.split(":")[1]);
+                this.nivelActual = nuevoNivel;
+                // Limpiar estado local del nivel para evitar desincronización
+                this.evidenciasReveladas = 0;
+                this.evidenciasDescubiertas.clear();
+                this.preguntaActual = 0;
+                this.respuestasCorrectasNivel = 0;
+                this.faseActual = FaseNivel.INVESTIGANDO;
+                
                 for (JuegoListener l : listeners) l.onNivelIniciado();
             } else if (data.startsWith("INTERROGATION_START:")) {
                 for (JuegoListener l : listeners) l.onInterrogatorioListo();
@@ -286,5 +311,9 @@ public class MultiplayerJuegoController extends JuegoController {
 
     public void enviarListoReporteFinalNivel5() {
         client.send(new GameMessage(GameMessage.Type.ACTION, "NIVEL5_REPORT_READY", getNombreJugador()));
+    }
+
+    public int getOponentePuntaje() {
+        return oponentePuntaje;
     }
 }

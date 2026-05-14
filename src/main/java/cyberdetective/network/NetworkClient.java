@@ -21,14 +21,23 @@ public class NetworkClient {
         
         new Thread(() -> {
             try {
-                socket = new Socket(host, port);
+                System.out.println("Intentando conectar a " + host + ":" + port + "...");
+                socket = new java.net.Socket();
+                socket.connect(new java.net.InetSocketAddress(host, port), 5000);
+                System.out.println("Socket conectado.");
+                
                 out = new ObjectOutputStream(socket.getOutputStream());
-                out.flush(); // Enviar cabecera inmediatamente
+                out.flush(); 
+                System.out.println("ObjectOutputStream flusheado.");
+                
                 in = new ObjectInputStream(socket.getInputStream());
+                System.out.println("ObjectInputStream listo.");
+                
                 running = true;
 
                 // Enviar mensaje inicial de conexión
                 send(new GameMessage(GameMessage.Type.CONNECT, playerName, playerName));
+                System.out.println("Mensaje CONNECT enviado para: " + playerName);
 
                 // Hilo para escuchar mensajes
                 new Thread(this::listen).start();

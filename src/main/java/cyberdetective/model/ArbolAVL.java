@@ -61,6 +61,7 @@ public class ArbolAVL implements java.io.Serializable {
     // ---------------- Inserción ----------------
 
     public void insertar(Caso caso) {
+        if (buscarPorId(caso.getId()) != null) return; // Evitar duplicados
         raiz = insertarRecursivo(raiz, caso);
     }
 

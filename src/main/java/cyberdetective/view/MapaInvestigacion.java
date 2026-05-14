@@ -91,6 +91,7 @@ public class MapaInvestigacion implements JuegoController.JuegoListener {
                 StackPane.setAlignment(labelEsperando, Pos.CENTER);
                 raiz.getChildren().add(labelEsperando);
                 
+                controller.removerListener(this);
                 controller.agregarListener(this);
 
                 // UI flotante encima — mouse transparent para no bloquear clics del mapa

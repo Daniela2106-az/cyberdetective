@@ -57,7 +57,10 @@ public class GameServer {
 
     public synchronized void addClient(ClientHandler client) {
         clients.add(client);
-        playerScores.put(client.getPlayerName(), 0);
+        // Persistir puntaje si el jugador se reconecta con el mismo nombre
+        if (!playerScores.containsKey(client.getPlayerName())) {
+            playerScores.put(client.getPlayerName(), 0);
+        }
         if (clients.size() == 1) {
             client.send(new GameMessage(GameMessage.Type.WAITING, "Esperando al segundo detective...", "SERVER"));
         } else if (clients.size() == 2) {
@@ -96,6 +99,7 @@ public class GameServer {
             int qIdx = Integer.parseInt(parts[1]);
             int option = Integer.parseInt(parts[2]);
             boolean correct = Boolean.parseBoolean(parts[3]);
+            String player = senderHandler.getPlayerName(); // Usar nombre del handler para seguridad
 
             if (currentQuestionIndex != qIdx) {
                 currentQuestionIndex = qIdx;
@@ -108,13 +112,11 @@ public class GameServer {
                 respondedPlayers.add(senderHandler);
                 if (correct) {
                     questionAnswered = true;
-                    String player = msg.getSender();
                     playerScores.put(player, playerScores.getOrDefault(player, 0) + 50);
                     broadcast(new GameMessage(GameMessage.Type.UPDATE_SCORE, 
                         "RESOLVED:" + player + ":" + qIdx + ":" + option + ":" + playerScores.get(player), "SERVER"));
                 } else {
                     failedCount++;
-                    String player = msg.getSender();
                     int newScore = Math.max(0, playerScores.getOrDefault(player, 0) - 25);
                     playerScores.put(player, newScore);
                     
@@ -145,15 +147,14 @@ public class GameServer {
                     return;
                 }
                 actionRespondedPlayers.add(senderHandler);
+                String player = senderHandler.getPlayerName();
                 if (correct) {
                     actionAnswered = true;
-                    String player = msg.getSender();
                     playerScores.put(player, playerScores.getOrDefault(player, 0) + 50);
                     broadcast(new GameMessage(GameMessage.Type.ACTION, 
                         "ACTION_RESOLVED:" + player + ":" + aIdx + ":" + playerScores.get(player), "SERVER"));
                 } else {
                     actionFailedCount++;
-                    String player = msg.getSender();
                     int newScore = Math.max(0, playerScores.getOrDefault(player, 0) - 25);
                     playerScores.put(player, newScore);
                     
@@ -167,8 +168,12 @@ public class GameServer {
                 }
             }
         } else if (data != null && data.startsWith("PHASE2_SCORE_UPDATE:")) {
-            String score = data.split(":")[1];
-            sendToOther(new GameMessage(GameMessage.Type.ACTION, "OPPONENT_SCORE_P2:" + score, msg.getSender()), msg.getSender());
+            int points = Integer.parseInt(data.split(":")[1]);
+            String player = senderHandler.getPlayerName();
+            int total = playerScores.getOrDefault(player, 0) + points;
+            playerScores.put(player, total);
+            // Enviamos el TOTAL al otro jugador para asegurar sincronización perfecta
+            sendToOther(new GameMessage(GameMessage.Type.ACTION, "OPPONENT_SCORE_P2:" + total, player), player);
         } else if ("REVEAL_EVIDENCE".equals(data)) {
             broadcast(new GameMessage(GameMessage.Type.ACTION, "OPPONENT_REVEALED", msg.getSender()));
         } else if (data != null && data.startsWith("LEVEL_READY:")) {
@@ -178,6 +183,11 @@ public class GameServer {
                 if (readyPlayers.size() >= 2) {
                     String levelIdx = data.split(":")[1];
                     broadcast(new GameMessage(GameMessage.Type.ACTION, "START_LEVEL:" + levelIdx, "SERVER"));
+                    // Enviar puntajes actuales para sincronización al inicio del nivel
+                    for (Map.Entry<String, Integer> entry : playerScores.entrySet()) {
+                        broadcast(new GameMessage(GameMessage.Type.UPDATE_SCORE, 
+                            "SYNC_SCORE:" + entry.getKey() + ":" + entry.getValue(), "SERVER"));
+                    }
                     readyPlayers.clear();
                     // Limpiar estados de sincronización previos para evitar bloqueos
                     avlReadyPlayers.clear();

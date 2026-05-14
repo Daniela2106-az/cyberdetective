@@ -1,6 +1,8 @@
 cyberdetective\server\GameServer.class
+cyberdetective\minijuego\ConexionMinijuego.class
 cyberdetective\controller\MultiplayerJuegoController.class
 cyberdetective\controller\JuegoController$JuegoListener.class
+cyberdetective\minijuego\SopaLetrasMinijuego.class
 cyberdetective\minijuego\GestorMinijuegos.class
 cyberdetective\view\MenuPrincipal.class
 cyberdetective\view\AccionesNivel.class
@@ -10,6 +12,7 @@ cyberdetective\view\PantallaJuego$Vista.class
 cyberdetective\view\MapaInvestigacion.class
 cyberdetective\server\ClientHandler.class
 cyberdetective\view\PanelEvidencias.class
+cyberdetective\minijuego\ConexionMinijuego$ConexionNode.class
 cyberdetective\network\NetworkClient.class
 cyberdetective\view\VisualizadorArbol.class
 cyberdetective\view\PantallaInicio.class
@@ -27,4 +30,5 @@ cyberdetective\controller\MultiplayerJuegoController$1.class
 cyberdetective\minijuego\EscombroMinijuego.class
 cyberdetective\model\NodoAVL.class
 cyberdetective\network\GameMessage.class
+cyberdetective\minijuego\SopaLetrasMinijuego$LetraCasilla.class
 cyberdetective\view\PantallaJuego.class

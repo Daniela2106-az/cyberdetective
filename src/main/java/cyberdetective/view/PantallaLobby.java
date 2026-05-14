@@ -88,11 +88,11 @@ public class PantallaLobby {
                 cyberdetective.server.GameServer.startInBackground();
                 
                 // Pequeña pausa para asegurar que el server abrió el puerto
-                javafx.animation.PauseTransition pause = new javafx.animation.PauseTransition(javafx.util.Duration.millis(500));
+                javafx.animation.PauseTransition pause = new javafx.animation.PauseTransition(javafx.util.Duration.millis(1000));
                 pause.setOnFinished(ev -> {
                     lblEstado.setText("✔ SERVIDOR ACTIVO - Esperando conexión...");
                     lblEstado.setTextFill(Color.web("#00ff88"));
-                    conectar("localhost", playerName);
+                    conectar("127.0.0.1", playerName);
                 });
                 pause.play();
             } else {
